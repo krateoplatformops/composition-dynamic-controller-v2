@@ -41,7 +41,6 @@ type Controller struct {
 	externalClient ExternalClient
 }
 
-// New creates a new Controller.
 func New(sid *shortid.Shortid, opts Options) *Controller {
 	rateLimiter := workqueue.NewMaxOfRateLimiter(
 		workqueue.NewItemExponentialFailureRateLimiter(3*time.Second, 180*time.Second),

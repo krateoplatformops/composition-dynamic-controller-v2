@@ -167,9 +167,6 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 		Str("name", mg.GetName()).
 		Str("namespace", mg.GetNamespace()).Logger()
 
-	// If we started but never completed creation of an external resource we
-	// may have lost critical information.The safest thing to
-	// do is to refuse to proceed.
 	if meta.ExternalCreateIncomplete(mg) {
 		log.Warn().Msg(errCreateIncomplete)
 		err := unstructuredtools.SetCondition(mg, condition.Creating())
