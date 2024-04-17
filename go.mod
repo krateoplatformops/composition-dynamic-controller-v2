@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.6
 
 require (
-	github.com/gobuffalo/flect v1.0.2
+	github.com/davecgh/go-spew v1.1.1
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.6.0
 	github.com/pkg/errors v0.9.1
@@ -19,6 +19,7 @@ require (
 	k8s.io/apimachinery v0.29.1
 	k8s.io/cli-runtime v0.29.1
 	k8s.io/client-go v0.29.1
+	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01
 	sigs.k8s.io/yaml v1.4.0
 )
 
@@ -39,7 +40,6 @@ require (
 	github.com/containerd/containerd v1.7.13 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/cli v25.0.2+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect

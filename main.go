@@ -97,7 +97,7 @@ func main() {
 	if len(*chart) > 0 {
 		pig = archive.Static(*chart)
 	} else {
-		pig, err = archive.Dynamic(cfg)
+		pig, err = archive.Dynamic(cfg, *debug)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Creating chart url info getter.")
 		}

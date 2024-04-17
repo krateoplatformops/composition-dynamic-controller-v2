@@ -50,7 +50,7 @@ kind-down: ## shuts down the KinD cluster
 	@$(KIND) delete cluster --name=$(KIND_CLUSTER_NAME)
 
 dev:
-	go run main.go -kubeconfig $(HOME)/.kube/config
+	go run main.go -debug -kubeconfig $(HOME)/.kube/config
 
 .PHONY: help
 help:

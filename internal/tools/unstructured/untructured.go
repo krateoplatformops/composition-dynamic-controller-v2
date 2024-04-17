@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gobuffalo/flect"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/controller"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/tools/unstructured/condition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/gengo/namer"
+	"k8s.io/gengo/types"
 )
 
 type NotAvailableError struct {
@@ -132,7 +133,10 @@ func GVR(un *unstructured.Unstructured) (schema.GroupVersionResource, error) {
 		return schema.GroupVersionResource{}, err
 	}
 
-	resource := strings.ToLower(flect.Pluralize(un.GetKind()))
+	kind := types.Type{Name: types.Name{Name: un.GetKind()}}
+	namer := namer.NewPrivatePluralNamer(nil)
+	resource := strings.ToLower(namer.Name(&kind))
+
 	return gv.WithResource(resource), nil
 }
 
