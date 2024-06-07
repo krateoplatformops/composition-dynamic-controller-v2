@@ -31,7 +31,7 @@ RUN CGO_ENABLED=0 GO111MODULE=on go build -a -o /bin/controller ./main.go && \
 # ----------------------
 FROM gcr.io/distroless/static:nonroot
 
-COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+# COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 COPY --from=builder /bin/controller /bin/controller

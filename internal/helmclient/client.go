@@ -286,7 +286,7 @@ func (c *HelmClient) install(ctx context.Context, spec *ChartSpec, opts *Generic
 
 	// NameAndChart returns either the TemplateName if set,
 	// the ReleaseName if set or the generatedName as the first return value.
-	releaseName, _, err := client.NameAndChart([]string{spec.ChartName})
+	releaseName, _, err := client.NameAndChart([]string{spec.ReleaseName})
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +476,7 @@ func (c *HelmClient) TemplateChart(spec *ChartSpec, options *HelmTemplateOptions
 
 	// NameAndChart returns either the TemplateName if set,
 	// the ReleaseName if set or the generatedName as the first return value.
-	releaseName, _, err := client.NameAndChart([]string{spec.ChartName})
+	releaseName, _, err := client.NameAndChart([]string{spec.ReleaseName})
 	if err != nil {
 		return nil, err
 	}
