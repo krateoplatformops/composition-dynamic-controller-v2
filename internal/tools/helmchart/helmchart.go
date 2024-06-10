@@ -126,6 +126,12 @@ func CheckResource(ctx context.Context, ref controller.ObjectRef, opts CheckReso
 	un, err := opts.DynamicClient.Resource(gvr).
 		Namespace(ref.Namespace).
 		Get(ctx, ref.Name, metav1.GetOptions{})
+	if un == nil {
+		// Try to get the resource without the namespace. This is useful for cluster-scoped resources.
+		un, err = opts.DynamicClient.Resource(gvr).
+			Get(ctx, ref.Name, metav1.GetOptions{})
+	}
+
 	if err != nil {
 		return nil, err
 	}
