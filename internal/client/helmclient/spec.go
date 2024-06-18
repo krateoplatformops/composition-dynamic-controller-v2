@@ -5,7 +5,7 @@ import (
 	"helm.sh/helm/v3/pkg/getter"
 	"sigs.k8s.io/yaml"
 
-	"github.com/krateoplatformops/composition-dynamic-controller/internal/helmclient/values"
+	"github.com/krateoplatformops/composition-dynamic-controller/internal/client/helmclient/values"
 )
 
 // GetValuesMap returns the merged mapped out values of a chart,

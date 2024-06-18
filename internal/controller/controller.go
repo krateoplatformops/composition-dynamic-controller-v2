@@ -3,8 +3,12 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/gobuffalo/flect"
 	"github.com/google/go-cmp/cmp"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/listwatcher"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/shortid"
@@ -41,6 +45,7 @@ type Controller struct {
 	externalClient ExternalClient
 }
 
+// New creates a new Controller.
 func New(sid *shortid.Shortid, opts Options) *Controller {
 	rateLimiter := workqueue.NewMaxOfRateLimiter(
 		workqueue.NewItemExponentialFailureRateLimiter(3*time.Second, 180*time.Second),
@@ -69,6 +74,18 @@ func New(sid *shortid.Shortid, opts Options) *Controller {
 				id, err := sid.Generate()
 				if err != nil {
 					opts.Logger.Error().Err(err).Msg("AddFunc: generating short id.")
+					return
+				}
+				gvr := schema.GroupVersionResource{
+					Group:    el.GroupVersionKind().Group,
+					Version:  strings.Split(el.GetAPIVersion(), "/")[1],
+					Resource: strings.ToLower(flect.Pluralize(el.GetKind())),
+				}
+
+				el.SetFinalizers(append(el.GetFinalizers(), "composition.krateo.io/finalizer"))
+				_, err = opts.Client.Resource(gvr).Namespace(el.GetNamespace()).Update(context.Background(), el, metav1.UpdateOptions{})
+				if err != nil {
+					opts.Logger.Error().Err(err).Msg("AddFunc: updating object finalizer.")
 					return
 				}
 
@@ -102,6 +119,19 @@ func New(sid *shortid.Shortid, opts Options) *Controller {
 					return
 				}
 
+				if newUns.GetDeletionTimestamp() != nil {
+					queue.Add(event{
+						id:        id,
+						eventType: Delete,
+						objectRef: ObjectRef{
+							APIVersion: newUns.GetAPIVersion(),
+							Kind:       newUns.GetKind(),
+							Name:       newUns.GetName(),
+							Namespace:  newUns.GetNamespace(),
+						},
+					})
+				}
+
 				newSpec, _, err := unstructured.NestedMap(newUns.Object, "spec")
 				if err != nil {
 					opts.Logger.Error().Err(err).Msg("UpdateFunc: getting new object spec.")
@@ -115,6 +145,7 @@ func New(sid *shortid.Shortid, opts Options) *Controller {
 
 				diff := cmp.Diff(newSpec, oldSpec)
 				opts.Logger.Debug().Str("diff", diff).Msg("UpdateFunc: comparing current spec with desired spec")
+
 				if len(diff) > 0 {
 					queue.Add(event{
 						id:        id,
@@ -139,29 +170,31 @@ func New(sid *shortid.Shortid, opts Options) *Controller {
 					})
 				}
 			},
+			// https://github.com/kubernetes/client-go/issues/606
+			// https://github.com/kubernetes/sample-controller/issues/50
 			DeleteFunc: func(obj interface{}) {
-				el, ok := obj.(*unstructured.Unstructured)
-				if !ok {
-					opts.Logger.Warn().Msg("DeleteFunc: object is not an unstructured.")
-					return
-				}
+				// el, ok := obj.(*unstructured.Unstructured)
+				// if !ok {
+				// 	opts.Logger.Warn().Msg("DeleteFunc: object is not an unstructured.")
+				// 	return
+				// }
 
-				id, err := sid.Generate()
-				if err != nil {
-					opts.Logger.Error().Err(err).Msg("DeleteFunc: generating short id.")
-					return
-				}
+				// id, err := sid.Generate()
+				// if err != nil {
+				// 	opts.Logger.Error().Err(err).Msg("DeleteFunc: generating short id.")
+				// 	return
+				// }
 
-				queue.Add(event{
-					id:        id,
-					eventType: Delete,
-					objectRef: ObjectRef{
-						APIVersion: el.GetAPIVersion(),
-						Kind:       el.GetKind(),
-						Name:       el.GetName(),
-						Namespace:  el.GetNamespace(),
-					},
-				})
+				// queue.Add(event{
+				// 	id:        id,
+				// 	eventType: Delete,
+				// 	objectRef: ObjectRef{
+				// 		APIVersion: el.GetAPIVersion(),
+				// 		Kind:       el.GetKind(),
+				// 		Name:       el.GetName(),
+				// 		Namespace:  el.GetNamespace(),
+				// 	},
+				// })
 			},
 		},
 		cache.Indexers{},

@@ -5,8 +5,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/krateoplatformops/composition-dynamic-controller/internal/client/helmclient"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/controller"
-	"github.com/krateoplatformops/composition-dynamic-controller/internal/helmclient"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/tools"
 	unstructuredtools "github.com/krateoplatformops/composition-dynamic-controller/internal/tools/unstructured"
 

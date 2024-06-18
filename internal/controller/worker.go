@@ -92,11 +92,11 @@ func (c *Controller) handleObserve(ctx context.Context, ref ObjectRef) error {
 			})
 			return nil
 		}
-
 		return err
 	}
 
 	if !exists {
+		// fmt.Println("Create: ", ref.String())
 		//return c.externalClient.Create(ctx, el)
 		c.queue.AddAfter(event{
 			eventType: Create,
@@ -153,7 +153,15 @@ func (c *Controller) handleDeleteEvent(ctx context.Context, ref ObjectRef) error
 		return nil
 	}
 
-	return c.externalClient.Delete(ctx, ref)
+	el, err := c.fetch(ctx, ref, true)
+	if err != nil {
+		c.logger.Err(err).
+			Str("objectRef", ref.String()).
+			Msg("Resolving unstructured object.")
+		return err
+	}
+
+	return c.externalClient.Delete(ctx, el)
 }
 
 func (c *Controller) fetch(ctx context.Context, ref ObjectRef, clean bool) (*unstructured.Unstructured, error) {

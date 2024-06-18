@@ -1,0 +1,7 @@
+kind: BasicAuth
+apiVersion: azure.devops.com/v1alpha1
+metadata:
+  name: basicauth-azure
+spec:
+  username: admin
+  password: <redacted>
