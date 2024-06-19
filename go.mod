@@ -4,6 +4,7 @@ go 1.21.6
 
 require (
 	github.com/davecgh/go-spew v1.1.1
+	github.com/gobuffalo/flect v1.0.2
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.6.0
 	github.com/pkg/errors v0.9.1

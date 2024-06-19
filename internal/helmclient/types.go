@@ -32,6 +32,12 @@ type RestConfClientOptions struct {
 	RestConfig *rest.Config
 }
 
+type RegistryAuth struct {
+	Username              string
+	Password              string
+	InsecureSkipTLSverify bool
+}
+
 // Options defines the options of a client. If Output is not set, os.Stdout will be used.
 type Options struct {
 	Namespace        string
@@ -42,6 +48,7 @@ type Options struct {
 	DebugLog         action.DebugLog
 	RegistryConfig   string
 	Output           io.Writer
+	RegistryAuth     *RegistryAuth
 }
 
 // RESTClientOption is a function that can be used to set the RESTClientOptions of a HelmClient.
@@ -85,6 +92,7 @@ type HelmClient struct {
 	linting      bool
 	output       io.Writer
 	DebugLog     action.DebugLog
+	RegistryAuth *RegistryAuth
 }
 
 type GenericHelmOptions struct {
