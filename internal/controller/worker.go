@@ -74,7 +74,7 @@ func (c *Controller) handleObserve(ctx context.Context, ref ObjectRef) error {
 		return nil
 	}
 
-	el, err := c.fetch(ctx, ref, true)
+	el, err := c.fetch(ctx, ref, false)
 	if err != nil {
 		c.logger.Err(err).
 			Str("objectRef", ref.String()).

@@ -32,9 +32,15 @@ func Install(ctx context.Context, opts InstallOptions) (*release.Release, int64,
 		return nil, 0, nil
 	}
 
+	uid := opts.Resource.GetUID()
 	claimGen := opts.Resource.GetGeneration()
 	chartSpec.ValuesYaml = string(dat)
 
-	rel, err := opts.HelmClient.InstallOrUpgradeChart(ctx, &chartSpec, nil)
+	helmOpts := &helmclient.GenericHelmOptions{
+		PostRenderer: &labelsPostRender{
+			UID: uid,
+		},
+	}
+	rel, err := opts.HelmClient.InstallOrUpgradeChart(ctx, &chartSpec, helmOpts)
 	return rel, claimGen, err
 }
