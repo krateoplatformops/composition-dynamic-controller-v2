@@ -93,12 +93,21 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 		return false, nil
 	}
 
-	all, err := helmchart.RenderTemplate(ctx, helmchart.RenderTemplateOptions{
+	renderOpts := helmchart.RenderTemplateOptions{
 		HelmClient:     hc,
 		Resource:       mg,
 		PackageUrl:     pkg.URL,
 		PackageVersion: pkg.Version,
-	})
+		Repo:           pkg.Repo,
+	}
+	if pkg.RegistryAuth != nil {
+		renderOpts.Credentials = &helmchart.Credentials{
+			Username: pkg.RegistryAuth.Username,
+			Password: pkg.RegistryAuth.Password,
+		}
+	}
+
+	all, err := helmchart.RenderTemplate(ctx, renderOpts)
 	if err != nil {
 		log.Err(err).Msg("Rendering helm chart template")
 		return false, err
@@ -196,11 +205,21 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 		return err
 	}
 
-	_, _, err = helmchart.Install(ctx, helmchart.InstallOptions{
+	opts := helmchart.InstallOptions{
 		HelmClient: hc,
 		ChartName:  pkg.URL,
 		Resource:   mg,
-	})
+		Repo:       pkg.Repo,
+		Version:    pkg.Version,
+	}
+	if pkg.RegistryAuth != nil {
+		opts.Credentials = &helmchart.Credentials{
+			Username: pkg.RegistryAuth.Username,
+			Password: pkg.RegistryAuth.Password,
+		}
+	}
+
+	_, _, err = helmchart.Install(ctx, opts)
 	if err != nil {
 		log.Err(err).Msgf("Installing helm chart: %s", pkg.URL)
 		meta.SetExternalCreateFailed(mg, time.Now())
@@ -278,11 +297,21 @@ func (h *handler) Update(ctx context.Context, mg *unstructured.Unstructured) err
 		return err
 	}
 
-	err = helmchart.Update(ctx, helmchart.UpdateOptions{
+	opts := helmchart.UpdateOptions{
 		HelmClient: hc,
 		ChartName:  pkg.URL,
 		Resource:   mg,
-	})
+		Repo:       pkg.Repo,
+		Version:    pkg.Version,
+	}
+	if pkg.RegistryAuth != nil {
+		opts.Credentials = &helmchart.Credentials{
+			Username: pkg.RegistryAuth.Username,
+			Password: pkg.RegistryAuth.Password,
+		}
+	}
+
+	err = helmchart.Update(ctx, opts)
 	if err != nil {
 		log.Err(err).Msg("Performing helm chart update")
 		return err

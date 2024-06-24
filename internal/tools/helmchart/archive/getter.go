@@ -25,6 +25,9 @@ type Info struct {
 	// Version of the chart release.
 	Version string `json:"version,omitempty"`
 
+	// Repo is the repository name.
+	Repo string `json:"repo,omitempty"`
+
 	// RegistryAuth is the credentials to access the registry.
 	RegistryAuth *helmclient.RegistryAuth `json:"registryAuth,omitempty"`
 }
@@ -157,6 +160,11 @@ func (g *dynamicGetter) Get(uns *unstructured.Unstructured) (*Info, error) {
 		log.Printf("[ERR] resolving 'spec.chart.version': %s (%s@%s)\n", err.Error(), got[0].GetName(), got[0].GetNamespace())
 		return nil, err
 	}
+	repo, _, err := unstructured.NestedString(got[0].UnstructuredContent(), "spec", "chart", "repo")
+	if err != nil {
+		log.Printf("[ERR] resolving 'spec.chart.repo': %s (%s@%s)\n", err.Error(), got[0].GetName(), got[0].GetNamespace())
+		return nil, err
+	}
 
 	username, _, err := unstructured.NestedString(got[0].UnstructuredContent(), "spec", "chart", "credentials", "username")
 	if err != nil {
@@ -191,6 +199,7 @@ func (g *dynamicGetter) Get(uns *unstructured.Unstructured) (*Info, error) {
 	return &Info{
 		URL:     packageUrl,
 		Version: packageVersion,
+		Repo:    repo,
 		RegistryAuth: &helmclient.RegistryAuth{
 			Username:              username,
 			Password:              password,

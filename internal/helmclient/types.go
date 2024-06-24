@@ -110,6 +110,8 @@ type HelmTemplateOptions struct {
 type ChartSpec struct {
 	ReleaseName string `json:"release"`
 	ChartName   string `json:"chart"`
+	Repo        string `json:"repo"`
+
 	// Namespace where the chart release is deployed.
 	// Note that helmclient.Options.Namespace should ideally match the namespace configured here.
 	Namespace string `json:"namespace"`
@@ -193,4 +195,10 @@ type ChartSpec struct {
 	// KeepHistory indicates whether to retain or purge the release history during uninstall
 	// +optional
 	KeepHistory bool `json:"keepHistory,omitempty"`
+
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+
+	// +optional
+	InsecureSkipTLSverify bool `json:"insecureSkipTLSverify,omitempty"`
 }
