@@ -499,8 +499,9 @@ func (c *HelmClient) TemplateChart(spec *ChartSpec, options *HelmTemplateOptions
 	client.DryRun = true
 	client.ReleaseName = spec.ReleaseName
 	client.Replace = true // Skip the name check
-	client.ClientOnly = true
+	client.ClientOnly = false
 	client.IncludeCRDs = true
+	client.DryRunOption = "server"
 
 	if options != nil {
 		client.KubeVersion = options.KubeVersion
