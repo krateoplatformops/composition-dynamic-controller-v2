@@ -129,12 +129,11 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 		ref, err := helmchart.CheckResource(ctx, el, opts)
 		if err != nil {
 			if ref == nil {
-				return true, err
+				log.Warn().Err(err).
+					Str("package", pkg.URL).
+					Msgf("Composition not ready due to: %s.", el.String())
+				return false, nil
 			}
-
-			log.Warn().Err(err).
-				Str("package", pkg.URL).
-				Msgf("Composition not ready due to: %s.", ref.String())
 
 			_ = unstructuredtools.SetFailedObjectRef(mg, ref)
 			_ = unstructuredtools.SetCondition(mg, condition.Unavailable())
