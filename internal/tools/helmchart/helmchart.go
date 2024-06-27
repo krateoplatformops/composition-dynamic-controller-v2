@@ -86,6 +86,9 @@ func RenderTemplate(ctx context.Context, opts RenderTemplateOptions) ([]controll
 		if err = decoder.Decode(&rawObj); err != nil {
 			return all, err
 		}
+		if rawObj.Raw == nil {
+			continue
+		}
 
 		obj, gvk, err := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme).Decode(rawObj.Raw, nil, nil)
 		if err != nil {

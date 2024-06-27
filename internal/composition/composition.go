@@ -148,6 +148,7 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 	log.Debug().Str("package", pkg.URL).Msg("Composition ready.")
 
 	if meta.ExternalCreateIncomplete(mg) {
+		meta.RemoveAnnotations(mg, meta.AnnotationKeyExternalCreatePending)
 		meta.SetExternalCreateSucceeded(mg, time.Now())
 		return true, tools.Update(ctx, mg, tools.UpdateOptions{
 			DiscoveryClient: h.discoveryClient,
@@ -175,6 +176,8 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 		Str("kind", mg.GetKind()).
 		Str("name", mg.GetName()).
 		Str("namespace", mg.GetNamespace()).Logger()
+
+	meta.RemoveAnnotations(mg, meta.AnnotationKeyExternalCreatePending)
 
 	if meta.ExternalCreateIncomplete(mg) {
 		log.Warn().Msg(errCreateIncomplete)
