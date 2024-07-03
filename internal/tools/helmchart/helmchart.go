@@ -45,6 +45,8 @@ type RenderTemplateOptions struct {
 	PackageUrl     string
 	PackageVersion string
 	Resource       *unstructured.Unstructured
+	Repo           string
+	Credentials    *Credentials
 }
 
 func RenderTemplate(ctx context.Context, opts RenderTemplateOptions) ([]controller.ObjectRef, error) {
@@ -59,6 +61,11 @@ func RenderTemplate(ctx context.Context, opts RenderTemplateOptions) ([]controll
 		ChartName:   opts.PackageUrl,
 		Version:     opts.PackageVersion,
 		ValuesYaml:  string(dat),
+		Repo:        opts.Repo,
+	}
+	if opts.Credentials != nil {
+		chartSpec.Username = opts.Credentials.Username
+		chartSpec.Password = opts.Credentials.Password
 	}
 
 	tpl, err := opts.HelmClient.TemplateChart(&chartSpec, nil)
@@ -78,6 +85,9 @@ func RenderTemplate(ctx context.Context, opts RenderTemplateOptions) ([]controll
 		var rawObj runtime.RawExtension
 		if err = decoder.Decode(&rawObj); err != nil {
 			return all, err
+		}
+		if rawObj.Raw == nil {
+			continue
 		}
 
 		obj, gvk, err := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme).Decode(rawObj.Raw, nil, nil)

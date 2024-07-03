@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,7 +74,7 @@ func (c *Controller) handleObserve(ctx context.Context, ref ObjectRef) error {
 		return nil
 	}
 
-	el, err := c.fetch(ctx, ref, true)
+	el, err := c.fetch(ctx, ref, false)
 	if err != nil {
 		c.logger.Err(err).
 			Str("objectRef", ref.String()).
@@ -97,11 +96,32 @@ func (c *Controller) handleObserve(ctx context.Context, ref ObjectRef) error {
 	}
 
 	if !exists {
-		//return c.externalClient.Create(ctx, el)
-		c.queue.AddAfter(event{
-			eventType: Create,
-			objectRef: ref,
-		}, time.Second*3)
+		return c.externalClient.Create(ctx, el)
+		// fmt.Println("Creating object")
+
+		// rateLimiter := workqueue.NewMaxOfRateLimiter(
+		// 	workqueue.NewItemExponentialFailureRateLimiter(3*time.Second, 180*time.Second),
+		// 	// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
+		// 	&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		// )
+
+		// c.queue = workqueue.NewRateLimitingQueue(rateLimiter)
+
+		// len := c.queue.Len()
+		// for {
+		// 	if len < c.queue.Len() {
+		// 		fmt.Println("Queue length changed", len, c.queue.Len())
+		// 		break
+		// 	}
+		// 	fmt.Println("Adding object to queue", len, c.queue.Len())
+		// 	c.queue.AddRateLimited(event{
+		// 		eventType: Create,
+		// 		objectRef: ref,
+		// 	})
+		// }
+
+		// fmt.Println("Object created", c.queue.Len())
+
 	}
 
 	return nil
@@ -114,6 +134,8 @@ func (c *Controller) handleCreate(ctx context.Context, ref ObjectRef) error {
 			Msg("No event handler registered.")
 		return nil
 	}
+
+	// fmt.Println("Creating object - handleCreate")
 
 	el, err := c.fetch(ctx, ref, true)
 	if err != nil {

@@ -29,7 +29,8 @@ type Client interface {
 	LintChart(spec *ChartSpec) error
 	SetDebugLog(debugLog action.DebugLog)
 	ListReleaseHistory(name string, max int) ([]*release.Release, error)
-	GetChart(chartName string, chartPathOptions *action.ChartPathOptions) (*chart.Chart, string, error)
+	// GetChart(chartName string, chartPathOptions *action.ChartPathOptions) (*chart.Chart, string, error)
+	GetChartV2(spec *ChartInfo) (*chart.Chart, string, error) //adds authentication and support for tgz and non oci compositions.
 }
 
 type RollBack interface {

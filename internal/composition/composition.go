@@ -70,7 +70,13 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 		return false, fmt.Errorf("helm chart package info getter must be specified")
 	}
 
-	hc, err := h.helmClientForResource(mg)
+	pkg, err := h.packageInfoGetter.Get(mg)
+	if err != nil {
+		log.Err(err).Msg("Getting package info")
+		return false, err
+	}
+
+	hc, err := h.helmClientForResource(mg, pkg.RegistryAuth)
 	if err != nil {
 		log.Err(err).Msg("Getting helm client")
 		return false, err
@@ -87,18 +93,21 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 		return false, nil
 	}
 
-	pkg, err := h.packageInfoGetter.Get(mg)
-	if err != nil {
-		log.Err(err).Msg("Getting package info")
-		return false, err
-	}
-
-	all, err := helmchart.RenderTemplate(ctx, helmchart.RenderTemplateOptions{
+	renderOpts := helmchart.RenderTemplateOptions{
 		HelmClient:     hc,
 		Resource:       mg,
 		PackageUrl:     pkg.URL,
 		PackageVersion: pkg.Version,
-	})
+		Repo:           pkg.Repo,
+	}
+	if pkg.RegistryAuth != nil {
+		renderOpts.Credentials = &helmchart.Credentials{
+			Username: pkg.RegistryAuth.Username,
+			Password: pkg.RegistryAuth.Password,
+		}
+	}
+
+	all, err := helmchart.RenderTemplate(ctx, renderOpts)
 	if err != nil {
 		log.Err(err).Msg("Rendering helm chart template")
 		return false, err
@@ -120,12 +129,11 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 		ref, err := helmchart.CheckResource(ctx, el, opts)
 		if err != nil {
 			if ref == nil {
-				return true, err
+				log.Warn().Err(err).
+					Str("package", pkg.URL).
+					Msgf("Composition not ready due to: %s.", el.String())
+				return false, nil
 			}
-
-			log.Warn().Err(err).
-				Str("package", pkg.URL).
-				Msgf("Composition not ready due to: %s.", ref.String())
 
 			_ = unstructuredtools.SetFailedObjectRef(mg, ref)
 			_ = unstructuredtools.SetCondition(mg, condition.Unavailable())
@@ -140,6 +148,7 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 	log.Debug().Str("package", pkg.URL).Msg("Composition ready.")
 
 	if meta.ExternalCreateIncomplete(mg) {
+		meta.RemoveAnnotations(mg, meta.AnnotationKeyExternalCreatePending)
 		meta.SetExternalCreateSucceeded(mg, time.Now())
 		return true, tools.Update(ctx, mg, tools.UpdateOptions{
 			DiscoveryClient: h.discoveryClient,
@@ -147,6 +156,7 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 		})
 	}
 
+	// fmt.Println("Update status")
 	_ = unstructuredtools.SetCondition(mg, condition.Available())
 	err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
 		DiscoveryClient: h.discoveryClient,
@@ -167,6 +177,8 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 		Str("name", mg.GetName()).
 		Str("namespace", mg.GetNamespace()).Logger()
 
+	meta.RemoveAnnotations(mg, meta.AnnotationKeyExternalCreatePending)
+
 	if meta.ExternalCreateIncomplete(mg) {
 		log.Warn().Msg(errCreateIncomplete)
 		err := unstructuredtools.SetCondition(mg, condition.Creating())
@@ -183,23 +195,33 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 		return fmt.Errorf("helm chart package info getter must be specified")
 	}
 
-	hc, err := h.helmClientForResource(mg)
-	if err != nil {
-		log.Err(err).Msg("Getting helm client")
-		return err
-	}
-
 	pkg, err := h.packageInfoGetter.Get(mg)
 	if err != nil {
 		log.Err(err).Msg("Getting package info")
 		return err
 	}
 
-	_, _, err = helmchart.Install(ctx, helmchart.InstallOptions{
+	hc, err := h.helmClientForResource(mg, pkg.RegistryAuth)
+	if err != nil {
+		log.Err(err).Msg("Getting helm client")
+		return err
+	}
+
+	opts := helmchart.InstallOptions{
 		HelmClient: hc,
 		ChartName:  pkg.URL,
 		Resource:   mg,
-	})
+		Repo:       pkg.Repo,
+		Version:    pkg.Version,
+	}
+	if pkg.RegistryAuth != nil {
+		opts.Credentials = &helmchart.Credentials{
+			Username: pkg.RegistryAuth.Username,
+			Password: pkg.RegistryAuth.Password,
+		}
+	}
+
+	_, _, err = helmchart.Install(ctx, opts)
 	if err != nil {
 		log.Err(err).Msgf("Installing helm chart: %s", pkg.URL)
 		meta.SetExternalCreateFailed(mg, time.Now())
@@ -265,23 +287,33 @@ func (h *handler) Update(ctx context.Context, mg *unstructured.Unstructured) err
 		return fmt.Errorf("helm chart package info getter must be specified")
 	}
 
-	hc, err := h.helmClientForResource(mg)
-	if err != nil {
-		log.Err(err).Msg("Getting helm client")
-		return err
-	}
-
 	pkg, err := h.packageInfoGetter.Get(mg)
 	if err != nil {
 		log.Err(err).Msg("Getting package info")
 		return err
 	}
 
-	err = helmchart.Update(ctx, helmchart.UpdateOptions{
+	hc, err := h.helmClientForResource(mg, pkg.RegistryAuth)
+	if err != nil {
+		log.Err(err).Msg("Getting helm client")
+		return err
+	}
+
+	opts := helmchart.UpdateOptions{
 		HelmClient: hc,
 		ChartName:  pkg.URL,
 		Resource:   mg,
-	})
+		Repo:       pkg.Repo,
+		Version:    pkg.Version,
+	}
+	if pkg.RegistryAuth != nil {
+		opts.Credentials = &helmchart.Credentials{
+			Username: pkg.RegistryAuth.Username,
+			Password: pkg.RegistryAuth.Password,
+		}
+	}
+
+	err = helmchart.Update(ctx, opts)
 	if err != nil {
 		log.Err(err).Msg("Performing helm chart update")
 		return err
@@ -303,7 +335,7 @@ func (h *handler) Delete(ctx context.Context, ref controller.ObjectRef) error {
 	mg.SetName(ref.Name)
 	mg.SetNamespace(ref.Namespace)
 
-	hc, err := h.helmClientForResource(&mg)
+	hc, err := h.helmClientForResource(&mg, nil)
 	if err != nil {
 		return err
 	}
@@ -337,7 +369,7 @@ func (h *handler) Delete(ctx context.Context, ref controller.ObjectRef) error {
 	return nil
 }
 
-func (h *handler) helmClientForResource(mg *unstructured.Unstructured) (helmclient.Client, error) {
+func (h *handler) helmClientForResource(mg *unstructured.Unstructured, registryAuth *helmclient.RegistryAuth) (helmclient.Client, error) {
 	log := h.logger.With().
 		Str("apiVersion", mg.GetAPIVersion()).
 		Str("kind", mg.GetKind()).
@@ -361,6 +393,7 @@ func (h *handler) helmClientForResource(mg *unstructured.Unstructured) (helmclie
 				log.Debug().Msg(format)
 			}
 		},
+		RegistryAuth: (registryAuth),
 	}
 
 	return helmclient.New(opts)
