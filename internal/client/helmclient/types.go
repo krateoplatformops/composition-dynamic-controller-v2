@@ -13,7 +13,7 @@ import (
 	"helm.sh/helm/v3/pkg/postrender"
 	"helm.sh/helm/v3/pkg/repo"
 
-	"github.com/krateoplatformops/composition-dynamic-controller/internal/helmclient/values"
+	"github.com/krateoplatformops/composition-dynamic-controller/internal/client/helmclient/values"
 )
 
 // Type Guard asserting that HelmClient satisfies the HelmClient interface.

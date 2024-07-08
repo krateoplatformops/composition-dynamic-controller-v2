@@ -42,7 +42,7 @@ type ExternalClient interface {
 	Observe(ctx context.Context, mg *unstructured.Unstructured) (bool, error)
 	Create(ctx context.Context, mg *unstructured.Unstructured) error
 	Update(ctx context.Context, mg *unstructured.Unstructured) error
-	Delete(ctx context.Context, ref ObjectRef) error
+	Delete(ctx context.Context, mg *unstructured.Unstructured) error
 }
 
 // An ExternalObservation is the result of an observation of an external resource.

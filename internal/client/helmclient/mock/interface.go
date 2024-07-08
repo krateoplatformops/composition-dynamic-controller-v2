@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	helmclient "github.com/krateoplatformops/composition-dynamic-controller/internal/helmclient"
+	helmclient "github.com/krateoplatformops/composition-dynamic-controller/internal/client/helmclient"
 	action "helm.sh/helm/v3/pkg/action"
 	chart "helm.sh/helm/v3/pkg/chart"
 	release "helm.sh/helm/v3/pkg/release"
