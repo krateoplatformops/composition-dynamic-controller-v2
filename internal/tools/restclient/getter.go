@@ -2,6 +2,7 @@ package getter
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -14,9 +15,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
@@ -114,12 +113,6 @@ func (pig staticGetter) Get(_ *unstructured.Unstructured) (*Info, error) {
 	}, nil
 }
 
-const (
-	labelKeyGroup    = "krateo.io/crd-group"
-	labelKeyVersion  = "krateo.io/crd-version"
-	labelKeyResource = "krateo.io/crd-resource"
-)
-
 var _ Getter = (*dynamicGetter)(nil)
 
 type dynamicGetter struct {
@@ -140,7 +133,7 @@ func (g *dynamicGetter) Get(un *unstructured.Unstructured) (*Info, error) {
 	gvrForDefinitions := schema.GroupVersionResource{
 		Group:    "swaggergen.krateo.io",
 		Version:  "v1alpha1",
-		Resource: "definitions",
+		Resource: "restdefinitions",
 	}
 
 	all, err := g.dynamicClient.Resource(gvrForDefinitions).
@@ -181,9 +174,9 @@ func (g *dynamicGetter) Get(un *unstructured.Unstructured) (*Info, error) {
 			continue
 		}
 
-		swaggerPath, ok, err := unstructured.NestedString(item.Object, "spec", "swaggerPath")
+		oasPath, ok, err := unstructured.NestedString(item.Object, "spec", "oasPath")
 		if !ok {
-			return nil, fmt.Errorf("missing spec.swaggerPath in definition for '%v' in namespace: %s", gvr, un.GetNamespace())
+			return nil, fmt.Errorf("missing spec.oasPath in definition for '%v' in namespace: %s", gvr, un.GetNamespace())
 		}
 		if err != nil {
 			return nil, err
@@ -211,7 +204,6 @@ func (g *dynamicGetter) Get(un *unstructured.Unstructured) (*Info, error) {
 		}
 
 		if group == gvr.Group {
-			// for _, res := range list {
 			gvk := un.GroupVersionKind()
 			// Convert the map to JSON
 			jsonData, err := json.Marshal(res)
@@ -232,13 +224,12 @@ func (g *dynamicGetter) Get(un *unstructured.Unstructured) (*Info, error) {
 
 			if resource.Kind == gvk.Kind {
 				return &Info{
-					URL:             swaggerPath,
+					URL:             oasPath,
 					Resource:        resource,
 					Auth:            auth,
 					OwnerReferences: ownerReferences,
 				}, nil
 			}
-			// }
 		}
 	}
 	return nil, nil
@@ -263,7 +254,7 @@ func (g *dynamicGetter) getAuth(un *unstructured.Unstructured) (httplib.AuthMeth
 		return nil, fmt.Errorf("missing spec.authenticationRefs in definition for '%v' in namespace: %s", gvr, un.GetNamespace())
 	}
 
-	for key, _ := range authenticationRefsMap {
+	for key := range authenticationRefsMap {
 		authRef, ok, err = unstructured.NestedString(un.Object, "spec", "authenticationRefs", key)
 		if err != nil {
 			return nil, fmt.Errorf("error getting spec.authenticationRefs.%s for '%v' in namespace: %s", key, gvr, un.GetNamespace())
@@ -304,12 +295,12 @@ func (g *dynamicGetter) getAuth(un *unstructured.Unstructured) (httplib.AuthMeth
 		return nil, err
 	}
 
-	return parseAuthentication(auth, authType)
+	return parseAuthentication(auth, authType, g.dynamicClient)
 }
 
 // parseAuthentication parses the authentication object and returns the appropriate AuthMethod for the given AuthType.
 // It returns an error if the authentication object is not valid.
-func parseAuthentication(un *unstructured.Unstructured, authType restclient.AuthType) (httplib.AuthMethod, error) {
+func parseAuthentication(un *unstructured.Unstructured, authType restclient.AuthType, dyn dynamic.Interface) (httplib.AuthMethod, error) {
 	gvr, err := unstructuredtools.GVR(un)
 	if err != nil {
 		return nil, err
@@ -322,13 +313,23 @@ func parseAuthentication(un *unstructured.Unstructured, authType restclient.Auth
 		if !ok {
 			return nil, fmt.Errorf("missing spec.username in definition for '%v' in namespace: %s", gvr, un.GetNamespace())
 		}
-		password, ok, err := unstructured.NestedString(un.Object, "spec", "password")
+		passwordRef, ok, err := unstructured.NestedStringMap(un.Object, "spec", "passwordRef")
 		if err != nil {
 			return nil, err
 		}
 		if !ok {
-			return nil, fmt.Errorf("missing spec.password in definition for '%v' in namespace: %s", gvr, un.GetNamespace())
+			return nil, fmt.Errorf("missing spec.passwordRef in definition for '%v' in namespace: %s", gvr, un.GetNamespace())
 		}
+
+		password, err := GetSecret(context.Background(), dyn, SecretKeySelector{
+			Name:      passwordRef["name"],
+			Namespace: passwordRef["namespace"],
+			Key:       passwordRef["key"],
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error getting password for '%v' in namespace: %s - %w", gvr, un.GetNamespace(), err)
+		}
+
 		return &httplib.BasicAuth{
 			Username: username,
 			Password: password,
@@ -348,33 +349,31 @@ func parseAuthentication(un *unstructured.Unstructured, authType restclient.Auth
 	return nil, fmt.Errorf("unknown auth type: %s", authType)
 }
 
-func (g *dynamicGetter) selectorForGVR(gvr schema.GroupVersionResource) (string, error) {
-	group, err := labels.NewRequirement(labelKeyGroup, selection.Equals, []string{gvr.Group})
-	if err != nil {
-		return "", err
-	}
-
-	version, err := labels.NewRequirement(labelKeyVersion, selection.Equals, []string{gvr.Version})
-	if err != nil {
-		return "", err
-	}
-
-	resource, err := labels.NewRequirement(labelKeyResource, selection.Equals, []string{gvr.Resource})
-	if err != nil {
-		return "", err
-	}
-
-	selector := labels.NewSelector().Add(*group, *version, *resource)
-
-	return selector.String(), nil
+type SecretKeySelector struct {
+	Name      string
+	Namespace string
+	Key       string
 }
 
-func selectorForGroup(gvr schema.GroupVersionResource) (string, error) {
-	group, err := labels.NewRequirement(labelKeyGroup, selection.Equals, []string{gvr.Group})
+func GetSecret(ctx context.Context, client dynamic.Interface, secretKeySelector SecretKeySelector) (string, error) {
+	gvr := schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "secrets",
+	}
+
+	sec, err := client.Resource(gvr).Namespace(secretKeySelector.Namespace).Get(ctx, secretKeySelector.Name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
-	selector := labels.NewSelector().Add(*group)
-
-	return selector.String(), nil
+	data, _, err := unstructured.NestedMap(sec.Object, "data")
+	if err != nil {
+		return "", err
+	}
+	bsec := data[secretKeySelector.Key].(string)
+	bkey, err := base64.StdEncoding.DecodeString(bsec)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode secret key: %w", err)
+	}
+	return string(bkey), nil
 }

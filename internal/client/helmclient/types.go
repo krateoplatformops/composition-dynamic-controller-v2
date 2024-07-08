@@ -32,6 +32,12 @@ type RestConfClientOptions struct {
 	RestConfig *rest.Config
 }
 
+type RegistryAuth struct {
+	Username              string
+	Password              string
+	InsecureSkipTLSverify bool
+}
+
 // Options defines the options of a client. If Output is not set, os.Stdout will be used.
 type Options struct {
 	Namespace        string
@@ -42,6 +48,7 @@ type Options struct {
 	DebugLog         action.DebugLog
 	RegistryConfig   string
 	Output           io.Writer
+	RegistryAuth     *RegistryAuth
 }
 
 // RESTClientOption is a function that can be used to set the RESTClientOptions of a HelmClient.
@@ -85,6 +92,7 @@ type HelmClient struct {
 	linting      bool
 	output       io.Writer
 	DebugLog     action.DebugLog
+	RegistryAuth *RegistryAuth
 }
 
 type GenericHelmOptions struct {
@@ -102,6 +110,8 @@ type HelmTemplateOptions struct {
 type ChartSpec struct {
 	ReleaseName string `json:"release"`
 	ChartName   string `json:"chart"`
+	Repo        string `json:"repo"`
+
 	// Namespace where the chart release is deployed.
 	// Note that helmclient.Options.Namespace should ideally match the namespace configured here.
 	Namespace string `json:"namespace"`
@@ -185,4 +195,10 @@ type ChartSpec struct {
 	// KeepHistory indicates whether to retain or purge the release history during uninstall
 	// +optional
 	KeepHistory bool `json:"keepHistory,omitempty"`
+
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+
+	// +optional
+	InsecureSkipTLSverify bool `json:"insecureSkipTLSverify,omitempty"`
 }

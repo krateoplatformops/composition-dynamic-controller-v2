@@ -151,9 +151,23 @@ func (u *UnstructuredClient) RequestedBody(httpMethod string, path string) (body
 	for schema := bodySchema.Schema.Schema().Properties.First(); schema != nil; schema = schema.Next() {
 		bodyParams.Add(schema.Key())
 	}
-	// for key, _ := range bodySchema.Properties {
-	// 	bodyParams.Add(key)
-	// }
+
+	schema, err := bodySchema.Schema.BuildSchema()
+	if err != nil {
+		return nil, fmt.Errorf("building schema for %s: %w", path, err)
+	}
+
+	for _, proxy := range schema.AllOf {
+		propSchema, err := proxy.BuildSchema()
+		if err != nil {
+			return nil, fmt.Errorf("building schema for %s: %w", path, err)
+		}
+		// Iterate over the properties of the schema with First() and Next()
+		for prop := propSchema.Properties.First(); prop != nil; prop = prop.Next() {
+			// Add the property to the schema
+			bodyParams.Add(prop.Key())
+		}
+	}
 
 	return bodyParams, nil
 }

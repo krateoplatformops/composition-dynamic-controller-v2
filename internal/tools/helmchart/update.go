@@ -8,10 +8,12 @@ import (
 )
 
 type UpdateOptions struct {
-	HelmClient helmclient.Client
-	ChartName  string
-	Version    string
-	Resource   *unstructured.Unstructured
+	HelmClient  helmclient.Client
+	ChartName   string
+	Version     string
+	Resource    *unstructured.Unstructured
+	Repo        string
+	Credentials *Credentials
 }
 
 func Update(ctx context.Context, opts UpdateOptions) error {

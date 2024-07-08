@@ -158,7 +158,7 @@ func New(sid *shortid.Shortid, opts Options) *Controller {
 						},
 					})
 				} else {
-					queue.Add(event{
+					queue.AddAfter(event{
 						id:        id,
 						eventType: Observe,
 						objectRef: ObjectRef{
@@ -167,7 +167,7 @@ func New(sid *shortid.Shortid, opts Options) *Controller {
 							Name:       newUns.GetName(),
 							Namespace:  newUns.GetNamespace(),
 						},
-					})
+					}, opts.ResyncInterval)
 				}
 			},
 			// https://github.com/kubernetes/client-go/issues/606

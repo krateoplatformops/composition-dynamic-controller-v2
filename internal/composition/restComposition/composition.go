@@ -262,10 +262,11 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 		return fmt.Errorf("response body is nil")
 	}
 
-	for k, v := range *body {
+	for k /* ,v */ := range *body {
 		for _, identifier := range clientInfo.Resource.Identifiers {
 			if k == identifier {
-				err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
+				// err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
+				err = unstructured.SetNestedField(mg.Object, nil, "status")
 				if err != nil {
 					log.Err(err).Msg("Setting identifier")
 					return err
