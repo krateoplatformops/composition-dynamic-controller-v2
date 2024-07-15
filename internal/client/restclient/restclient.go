@@ -94,7 +94,7 @@ func (u *UnstructuredClient) Get(ctx context.Context, cli *http.Client, path str
 		return nil, fmt.Errorf("operation not found: %s", httpMethod)
 	}
 
-	validStatusCode, err := getValidResponseCode(getDoc.Responses.Codes)
+	validStatusCodes, err := getValidResponseCode(getDoc.Responses.Codes)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (u *UnstructuredClient) Get(ctx context.Context, cli *http.Client, path str
 		ResponseHandler: httplib.FromJSON(&val),
 		AuthMethod:      u.Auth,
 		Validators: []httplib.HandleResponseFunc{
-			httplib.ErrorJSON(apiErr, validStatusCode),
+			httplib.ErrorJSON(apiErr, validStatusCodes...),
 		},
 	})
 	if err != nil {
@@ -143,7 +143,7 @@ func (u *UnstructuredClient) Post(ctx context.Context, cli *http.Client, path st
 		return nil, fmt.Errorf("operation not found: %s", httpMethod)
 	}
 
-	validStatusCode, err := getValidResponseCode(getDoc.Responses.Codes)
+	validStatusCodes, err := getValidResponseCode(getDoc.Responses.Codes)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func (u *UnstructuredClient) Post(ctx context.Context, cli *http.Client, path st
 		ResponseHandler: httplib.FromJSON(&val),
 		AuthMethod:      u.Auth,
 		Validators: []httplib.HandleResponseFunc{
-			httplib.ErrorJSON(apiErr, validStatusCode),
+			httplib.ErrorJSON(apiErr, validStatusCodes...),
 		},
 	})
 	if err != nil {
@@ -187,7 +187,7 @@ func (u *UnstructuredClient) List(ctx context.Context, cli *http.Client, path st
 		return nil, fmt.Errorf("operation not found: %s", httpMethod)
 	}
 
-	validStatusCode, err := getValidResponseCode(getDoc.Responses.Codes)
+	validStatusCodes, err := getValidResponseCode(getDoc.Responses.Codes)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (u *UnstructuredClient) List(ctx context.Context, cli *http.Client, path st
 		ResponseHandler: httplib.FromJSON(&val),
 		AuthMethod:      u.Auth,
 		Validators: []httplib.HandleResponseFunc{
-			httplib.ErrorJSON(apiErr, validStatusCode),
+			httplib.ErrorJSON(apiErr, validStatusCodes...),
 		},
 	})
 	if err != nil {
@@ -269,7 +269,7 @@ func (u *UnstructuredClient) Patch(ctx context.Context, cli *http.Client, path s
 		return nil, fmt.Errorf("operation not found: %s", httpMethod)
 	}
 
-	validStatusCode, err := getValidResponseCode(getDoc.Responses.Codes)
+	validStatusCodes, err := getValidResponseCode(getDoc.Responses.Codes)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +279,7 @@ func (u *UnstructuredClient) Patch(ctx context.Context, cli *http.Client, path s
 		ResponseHandler: httplib.FromJSON(&val),
 		AuthMethod:      u.Auth,
 		Validators: []httplib.HandleResponseFunc{
-			httplib.ErrorJSON(apiErr, validStatusCode),
+			httplib.ErrorJSON(apiErr, validStatusCodes...),
 		},
 	})
 	if err != nil {
@@ -313,13 +313,14 @@ func (u *UnstructuredClient) Delete(ctx context.Context, cli *http.Client, path 
 		return nil, fmt.Errorf("operation not found: %s", httpMethod)
 	}
 
-	validStatusCode, err := getValidResponseCode(getDoc.Responses.Codes)
+	validStatusCodes, err := getValidResponseCode(getDoc.Responses.Codes)
 	if err != nil {
 		return nil, err
 	}
 
 	rh := httplib.FromJSON(&val)
-	if validStatusCode == http.StatusNoContent {
+
+	if containsStatusCode(http.StatusNoContent, validStatusCodes) {
 		rh = nil
 	}
 
@@ -328,11 +329,20 @@ func (u *UnstructuredClient) Delete(ctx context.Context, cli *http.Client, path 
 		ResponseHandler: rh,
 		AuthMethod:      u.Auth,
 		Validators: []httplib.HandleResponseFunc{
-			httplib.ErrorJSON(apiErr, validStatusCode),
+			httplib.ErrorJSON(apiErr, validStatusCodes...),
 		},
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &val, nil
+}
+
+func containsStatusCode(statusCode int, validStatusCodes []int) bool {
+	for _, v := range validStatusCodes {
+		if v == statusCode {
+			return true
+		}
+	}
+	return false
 }
