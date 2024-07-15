@@ -94,17 +94,20 @@ func buildPath(baseUrl string, path string, parameters map[string]string, query 
 	return parsed
 }
 
-func getValidResponseCode(codes *orderedmap.Map[string, *v3.Response]) (int, error) {
+func getValidResponseCode(codes *orderedmap.Map[string, *v3.Response]) ([]int, error) {
+
+	var validCodes []int
 	for code := codes.First(); code != nil; code = code.Next() {
 		icode, err := strconv.Atoi(code.Key())
 		if err != nil {
-			return 0, fmt.Errorf("invalid response code: %s", code.Key())
+			return nil, fmt.Errorf("invalid response code: %s", code.Key())
 		}
 		if icode >= 200 && icode < 300 {
-			return icode, nil
+			validCodes = append(validCodes, icode)
+			// return icode, nil
 		}
 	}
-	return 0, fmt.Errorf("no valid response code found")
+	return validCodes, nil
 }
 
 func (u *UnstructuredClient) ValidateRequest(httpMethod string, path string, parameters map[string]string, query map[string]string) error {

@@ -17,6 +17,7 @@ import (
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/text"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/tools/apiaction"
 	getter "github.com/krateoplatformops/composition-dynamic-controller/internal/tools/restclient"
+	"github.com/krateoplatformops/composition-dynamic-controller/internal/tools/unstructured/condition"
 	"github.com/lucasepe/httplib"
 
 	"github.com/rs/zerolog"
@@ -207,6 +208,20 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 			Resource: flect.Pluralize(strings.ToLower(mg.GetKind())),
 		}, mg.GetName())
 	}
+	log.Debug().Str("Resource", mg.GetKind()).Msg("Setting condition.")
+	err = unstructuredtools.SetCondition(mg, condition.Available())
+	if err != nil {
+		log.Err(err).Msg("Setting condition")
+		return false, err
+	}
+	err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
+		DiscoveryClient: h.discoveryClient,
+		DynamicClient:   h.dynamicClient,
+	})
+	if err != nil {
+		log.Err(err).Msg("Updating status")
+		return false, err
+	}
 
 	log.Debug().Str("Resource", mg.GetKind()).Msg("External resource up-to-date.")
 
@@ -276,6 +291,12 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 	}
 
 	log.Debug().Str("Resource", mg.GetKind()).Msg("Creating external resource.")
+
+	err = unstructuredtools.SetCondition(mg, condition.Creating())
+	if err != nil {
+		log.Err(err).Msg("Setting condition")
+		return err
+	}
 
 	err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
 		DiscoveryClient: h.discoveryClient,
@@ -356,6 +377,21 @@ func (h *handler) Update(ctx context.Context, mg *unstructured.Unstructured) err
 
 	log.Debug().Str("Resource", mg.GetKind()).Msg("Creating external resource.")
 
+	err = unstructuredtools.SetCondition(mg, condition.Creating())
+	if err != nil {
+		log.Err(err).Msg("Setting condition")
+		return err
+	}
+
+	err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
+		DiscoveryClient: h.discoveryClient,
+		DynamicClient:   h.dynamicClient,
+	})
+	if err != nil {
+		log.Err(err).Msg("Updating status")
+		return err
+	}
+
 	err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
 		DiscoveryClient: h.discoveryClient,
 		DynamicClient:   h.dynamicClient,
@@ -425,6 +461,21 @@ func (h *handler) Delete(ctx context.Context, mg *unstructured.Unstructured) err
 	}
 
 	log.Debug().Str("Resource", mg.GetKind()).Msg("Deleting external resource.")
+
+	err = unstructuredtools.SetCondition(mg, condition.Deleting())
+	if err != nil {
+		log.Err(err).Msg("Setting condition")
+		return err
+	}
+
+	err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
+		DiscoveryClient: h.discoveryClient,
+		DynamicClient:   h.dynamicClient,
+	})
+	if err != nil {
+		log.Err(err).Msg("Updating status")
+		return err
+	}
 
 	// Deleting finalizer
 	mg.SetFinalizers([]string{})
