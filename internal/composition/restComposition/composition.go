@@ -127,6 +127,10 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 			isKnown = true
 			break
 		}
+		if specFields[identifier] != nil {
+			isKnown = true
+			break
+		}
 	}
 	if isKnown {
 		// Getting the external resource by its identifier
@@ -275,19 +279,6 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 	}
 	if body == nil {
 		return fmt.Errorf("response body is nil")
-	}
-
-	for k /* ,v */ := range *body {
-		for _, identifier := range clientInfo.Resource.Identifiers {
-			if k == identifier {
-				// err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
-				err = unstructured.SetNestedField(mg.Object, nil, "status")
-				if err != nil {
-					log.Err(err).Msg("Setting identifier")
-					return err
-				}
-			}
-		}
 	}
 
 	log.Debug().Str("Resource", mg.GetKind()).Msg("Creating external resource.")
