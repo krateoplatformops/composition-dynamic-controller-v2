@@ -237,20 +237,38 @@ func isCRUpdated(def getter.Resource, mg *unstructured.Unstructured, rm map[stri
 			if !reflect.DeepEqual(specs[field], rm[field]) {
 				return false, nil
 			}
-
 		}
 		return true, nil
 	}
 
-	for k, v := range specs {
-		// Skip fields that are not in the response
-		if _, ok := rm[k]; !ok {
+	return compareExisting(mg, rm)
+}
+
+// recursive function to compare the field existing in the response rm with the field in the mg
+func compareExisting(mg *unstructured.Unstructured, rm map[string]interface{}) (bool, error) {
+	for k, v := range rm {
+		if v == nil {
 			continue
 		}
-		if !reflect.DeepEqual(v, rm[k]) {
-			return false, nil
+		if reflect.TypeOf(v).Kind() == reflect.Map {
+			m, ok := v.(map[string]interface{})
+			if !ok {
+				return false, fmt.Errorf("error converting value to map[string]interface{}")
+			}
+			if reflect.DeepEqual(m, mg.Object[k]) {
+				continue
+			}
+			return compareExisting(mg, m)
 		}
-	}
+		if _, ok := mg.Object[k]; !ok {
+			continue
+		}
 
+		if reflect.DeepEqual(v, mg.Object[k]) {
+			continue
+		}
+		return false, nil
+	}
 	return true, nil
+
 }
