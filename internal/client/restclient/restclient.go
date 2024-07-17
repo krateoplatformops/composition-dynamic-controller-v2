@@ -219,18 +219,20 @@ func (u *UnstructuredClient) FindBy(ctx context.Context, cli *http.Client, path 
 
 						for _, ide := range u.IdentifierFields {
 							idepath := strings.Split(ide, ".") // split the identifier field by '.'
-							responseValue, ok, err := unstructured.NestedString(item, idepath...)
+							responseValue, _, err := unstructured.NestedString(item, idepath...)
+							if err != nil {
+								val, _, err := unstructured.NestedFieldCopy(item, idepath...)
+								if err != nil {
+									return nil, fmt.Errorf("error getting nested field: %w", err)
+								}
+								responseValue = fmt.Sprintf("%v", val)
+							}
+							ok, err = u.isInSpecFields(ide, responseValue)
 							if err != nil {
 								return nil, err
 							}
 							if ok {
-								ok, err := u.isInSpecFields(ide, responseValue)
-								if err != nil {
-									return nil, err
-								}
-								if ok {
-									return &item, nil
-								}
+								return &item, nil
 							}
 						}
 					}
