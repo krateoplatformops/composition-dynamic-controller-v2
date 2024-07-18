@@ -83,7 +83,7 @@ func APICallBuilder(cli *restclient.UnstructuredClient, info *getter.Info, actio
 			}
 		}
 	}
-	return nil, nil, fmt.Errorf("impossible to build api call for action %s", action.String())
+	return nil, nil, nil //fmt.Errorf("impossible to build api call for action %s", action.String())
 }
 
 func BuildCallConfig(callInfo *CallInfo, statusFields map[string]interface{}, specFields map[string]interface{}) *restclient.RequestConfiguration {
@@ -106,9 +106,15 @@ func processFields(callInfo *CallInfo, fields map[string]interface{}, reqConfigu
 		}
 		if callInfo.ReqParams.Parameters.Contains(field) {
 			stringVal := fmt.Sprintf("%v", value)
+			if stringVal == "" && reqConfiguration.Parameters[field] != "" {
+				continue
+			}
 			reqConfiguration.Parameters[field] = stringVal
 		} else if callInfo.ReqParams.Query.Contains(field) {
 			stringVal := fmt.Sprintf("%v", value)
+			if stringVal == "" && reqConfiguration.Query[field] != "" {
+				continue
+			}
 			reqConfiguration.Query[field] = stringVal
 		} else if callInfo.ReqParams.Body.Contains(field) {
 			mapBody[field] = value
@@ -118,9 +124,9 @@ func processFields(callInfo *CallInfo, fields map[string]interface{}, reqConfigu
 
 // if there are alternative fields, we need to check if the field is in the alternative field mapping
 func processAltFields(callInfo *CallInfo, field string, value interface{}) (string, interface{}) {
-
 	val := value
 	for new, old := range callInfo.AltFields {
+		// fmt.Println("Check before processing: ", new, old)
 		split := strings.Split(new, ".")
 		for i, altf := range split {
 			if strings.Contains(altf, "[]") {
@@ -129,14 +135,16 @@ func processAltFields(callInfo *CallInfo, field string, value interface{}) (stri
 					continue
 				}
 				strVal := ""
-				for _, val := range arrayVal {
-					_, v := processAltFields(callInfo, split[i+1], val)
+				for _, value := range arrayVal {
+					fmt.Println("len: ", len(split), i)
+					_, v := processAltFields(callInfo, split[i+1], value)
 					strv, ok := v.(string)
 					if !ok {
 						continue
 					}
 					strVal += strv
-					// fmt.Println("After recursive call: ", f, v, strVal)
+					strVal += ","
+					// fmt.Println("After recursive call: ", f, strVal)
 				}
 				strVal = strings.TrimSuffix(strVal, ",")
 				val = strVal

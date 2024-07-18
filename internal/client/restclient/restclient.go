@@ -320,7 +320,9 @@ func (u *UnstructuredClient) Delete(ctx context.Context, cli *http.Client, path 
 		return nil, err
 	}
 
-	rh := httplib.FromJSON(&val)
+	var response any
+
+	rh := httplib.FromJSON(&response)
 
 	if containsStatusCode(http.StatusNoContent, validStatusCodes) {
 		rh = nil
@@ -336,6 +338,11 @@ func (u *UnstructuredClient) Delete(ctx context.Context, cli *http.Client, path 
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	val, ok = response.(map[string]interface{})
+	if !ok {
+		return nil, nil
 	}
 	return &val, nil
 }
