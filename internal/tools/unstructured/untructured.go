@@ -90,9 +90,20 @@ func GetConditions(un *unstructured.Unstructured) []metav1.Condition {
 		x = append(x, metav1.Condition{
 			Type:   m["type"].(string),
 			Status: metav1.ConditionStatus(m["status"].(string)),
+			Reason: m["reason"].(string),
 		})
 	}
 	return x
+}
+
+func IsConditionSet(un *unstructured.Unstructured, cond metav1.Condition) bool {
+	conds := GetConditions(un)
+	for _, co := range conds {
+		if co.Type == cond.Type && co.Status == cond.Status && co.Reason == cond.Reason {
+			return true
+		}
+	}
+	return false
 }
 
 func SetFailedObjectRef(un *unstructured.Unstructured, ref *controller.ObjectRef) error {

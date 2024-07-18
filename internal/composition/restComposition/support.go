@@ -83,7 +83,7 @@ func APICallBuilder(cli *restclient.UnstructuredClient, info *getter.Info, actio
 			}
 		}
 	}
-	return nil, nil, fmt.Errorf("impossible to build api call for action %s", action.String())
+	return nil, nil, nil //fmt.Errorf("impossible to build api call for action %s", action.String())
 }
 
 func BuildCallConfig(callInfo *CallInfo, statusFields map[string]interface{}, specFields map[string]interface{}) *restclient.RequestConfiguration {
@@ -106,9 +106,15 @@ func processFields(callInfo *CallInfo, fields map[string]interface{}, reqConfigu
 		}
 		if callInfo.ReqParams.Parameters.Contains(field) {
 			stringVal := fmt.Sprintf("%v", value)
+			if stringVal == "" && reqConfiguration.Parameters[field] != "" {
+				continue
+			}
 			reqConfiguration.Parameters[field] = stringVal
 		} else if callInfo.ReqParams.Query.Contains(field) {
 			stringVal := fmt.Sprintf("%v", value)
+			if stringVal == "" && reqConfiguration.Query[field] != "" {
+				continue
+			}
 			reqConfiguration.Query[field] = stringVal
 		} else if callInfo.ReqParams.Body.Contains(field) {
 			mapBody[field] = value
@@ -118,9 +124,9 @@ func processFields(callInfo *CallInfo, fields map[string]interface{}, reqConfigu
 
 // if there are alternative fields, we need to check if the field is in the alternative field mapping
 func processAltFields(callInfo *CallInfo, field string, value interface{}) (string, interface{}) {
-
 	val := value
 	for new, old := range callInfo.AltFields {
+		// fmt.Println("Check before processing: ", new, old)
 		split := strings.Split(new, ".")
 		for i, altf := range split {
 			if strings.Contains(altf, "[]") {
@@ -129,14 +135,16 @@ func processAltFields(callInfo *CallInfo, field string, value interface{}) (stri
 					continue
 				}
 				strVal := ""
-				for _, val := range arrayVal {
-					_, v := processAltFields(callInfo, split[i+1], val)
+				for _, value := range arrayVal {
+					fmt.Println("len: ", len(split), i)
+					_, v := processAltFields(callInfo, split[i+1], value)
 					strv, ok := v.(string)
 					if !ok {
 						continue
 					}
 					strVal += strv
-					// fmt.Println("After recursive call: ", f, v, strVal)
+					strVal += ","
+					// fmt.Println("After recursive call: ", f, strVal)
 				}
 				strVal = strings.TrimSuffix(strVal, ",")
 				val = strVal
@@ -237,20 +245,38 @@ func isCRUpdated(def getter.Resource, mg *unstructured.Unstructured, rm map[stri
 			if !reflect.DeepEqual(specs[field], rm[field]) {
 				return false, nil
 			}
-
 		}
 		return true, nil
 	}
 
-	for k, v := range specs {
-		// Skip fields that are not in the response
-		if _, ok := rm[k]; !ok {
+	return compareExisting(mg, rm)
+}
+
+// recursive function to compare the field existing in the response rm with the field in the mg
+func compareExisting(mg *unstructured.Unstructured, rm map[string]interface{}) (bool, error) {
+	for k, v := range rm {
+		if v == nil {
 			continue
 		}
-		if !reflect.DeepEqual(v, rm[k]) {
-			return false, nil
+		if reflect.TypeOf(v).Kind() == reflect.Map {
+			m, ok := v.(map[string]interface{})
+			if !ok {
+				return false, fmt.Errorf("error converting value to map[string]interface{}")
+			}
+			if reflect.DeepEqual(m, mg.Object[k]) {
+				continue
+			}
+			return compareExisting(mg, m)
 		}
-	}
+		if _, ok := mg.Object[k]; !ok {
+			continue
+		}
 
+		if reflect.DeepEqual(v, mg.Object[k]) {
+			continue
+		}
+		return false, nil
+	}
 	return true, nil
+
 }

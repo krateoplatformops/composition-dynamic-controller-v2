@@ -135,6 +135,10 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 	if isKnown {
 		// Getting the external resource by its identifier
 		apiCall, callInfo, err := APICallBuilder(cli, clientInfo, apiaction.Get)
+		if apiCall == nil {
+			log.Warn().Msgf("API call not found for %s", apiaction.Get)
+			return true, nil
+		}
 		if err != nil {
 			log.Err(err).Msg("Building API call")
 			return false, err
@@ -157,6 +161,25 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 		}
 	} else {
 		apiCall, callInfo, err := APICallBuilder(cli, clientInfo, apiaction.FindBy)
+		if apiCall == nil {
+			if !unstructuredtools.IsConditionSet(mg, condition.Creating()) && !unstructuredtools.IsConditionSet(mg, condition.Available()) {
+				log.Debug().Str("Resource", mg.GetKind()).Msg("External resource is being created.")
+				return false, nil
+			}
+			log.Warn().Msgf("API call not found for %s", apiaction.FindBy)
+			log.Warn().Msgf("Resource is assumed to be up-to-date.")
+			cond := condition.Available()
+			cond.Message = "Resource is assumed to be up-to-date. API call not found for FindBy."
+			err = unstructuredtools.SetCondition(mg, cond)
+			if err != nil {
+				log.Err(err).Msg("Setting condition")
+				return false, err
+			}
+			return true, tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
+				DiscoveryClient: h.discoveryClient,
+				DynamicClient:   h.dynamicClient,
+			})
+		}
 		if err != nil {
 			log.Err(err).Msg("Building API call")
 			return false, err
@@ -229,10 +252,7 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 
 	log.Debug().Str("Resource", mg.GetKind()).Msg("External resource up-to-date.")
 
-	return true, nil // apierrors.NewNotFound(schema.GroupResource{
-	//		Group:    mg.GroupVersionKind().Group,
-	//		Resource: flect.Pluralize(strings.ToLower(mg.GetKind())),
-	//	}, mg.GetName())
+	return true, nil
 }
 
 func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) error {
@@ -456,15 +476,6 @@ func (h *handler) Delete(ctx context.Context, mg *unstructured.Unstructured) err
 	err = unstructuredtools.SetCondition(mg, condition.Deleting())
 	if err != nil {
 		log.Err(err).Msg("Setting condition")
-		return err
-	}
-
-	err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
-		DiscoveryClient: h.discoveryClient,
-		DynamicClient:   h.dynamicClient,
-	})
-	if err != nil {
-		log.Err(err).Msg("Updating status")
 		return err
 	}
 
