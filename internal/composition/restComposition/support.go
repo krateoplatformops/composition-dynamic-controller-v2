@@ -55,6 +55,9 @@ func APICallBuilder(cli *restclient.UnstructuredClient, info *getter.Info, actio
 				if err != nil {
 					return nil, nil, fmt.Errorf("error retrieving requested body params: %s", err)
 				}
+				if body == nil {
+					body = text.StringSet{}
+				}
 			}
 
 			callInfo := &CallInfo{
@@ -80,6 +83,8 @@ func APICallBuilder(cli *restclient.UnstructuredClient, info *getter.Info, actio
 				return cli.Patch, callInfo, nil
 			case restclient.APICallsTypeFindBy:
 				return cli.FindBy, callInfo, nil
+			case restclient.APICallsTypePut:
+				return cli.Put, callInfo, nil
 			}
 		}
 	}

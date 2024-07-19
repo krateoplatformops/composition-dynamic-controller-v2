@@ -26,6 +26,7 @@ const (
 	APICallsTypeDelete APICallType = "delete"
 	APICallsTypePatch  APICallType = "patch"
 	APICallsTypeFindBy APICallType = "findby"
+	APICallsTypePut    APICallType = "put"
 )
 
 func (a APICallType) String() string {
@@ -46,6 +47,8 @@ func StringToApiCallType(ty string) (APICallType, error) {
 		return APICallsTypePatch, nil
 	case "findby":
 		return APICallsTypeFindBy, nil
+	case "put":
+		return APICallsTypePut, nil
 	}
 	return "", fmt.Errorf("unknown api call type: %s", ty)
 }
@@ -146,6 +149,9 @@ func (u *UnstructuredClient) RequestedBody(httpMethod string, path string) (body
 		return nil, fmt.Errorf("operation not found: %s", httpMethod)
 	}
 	bodyParams = stringset.NewStringSet()
+	if getDoc.RequestBody == nil {
+		return nil, nil
+	}
 	bodySchema, ok := getDoc.RequestBody.Content.Get("application/json")
 	if !ok {
 		return bodyParams, nil
