@@ -503,7 +503,7 @@ func isResourceKnown(cli *restclient.UnstructuredClient, log zerolog.Logger, cli
 		return false
 	}
 
-	if cli.ValidateRequest("GET", callInfo.Path, reqConfiguration.Parameters, reqConfiguration.Query) == nil {
+	if cli.ValidateRequest("GET", callInfo.Path, reqConfiguration.Parameters, reqConfiguration.Query) != nil {
 		return false
 	}
 	return true
