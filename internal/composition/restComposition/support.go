@@ -105,7 +105,9 @@ func BuildCallConfig(callInfo *CallInfo, statusFields map[string]interface{}, sp
 
 func processFields(callInfo *CallInfo, fields map[string]interface{}, reqConfiguration *restclient.RequestConfiguration, mapBody map[string]interface{}) {
 	for field, value := range fields {
+		// fmt.Println("Processing field: ", field, value)
 		field, value = processAltFields(callInfo, field, value)
+		// fmt.Println("Field: ", field, value)
 		if field == "" {
 			continue
 		}
@@ -131,40 +133,43 @@ func processFields(callInfo *CallInfo, fields map[string]interface{}, reqConfigu
 func processAltFields(callInfo *CallInfo, field string, value interface{}) (string, interface{}) {
 	val := value
 	for new, old := range callInfo.AltFields {
-		// fmt.Println("Check before processing: ", new, old)
-		split := strings.Split(new, ".")
-		for i, altf := range split {
-			if strings.Contains(altf, "[]") {
-				arrayVal, ok := val.([]interface{})
-				if !ok {
-					continue
-				}
-				strVal := ""
-				for _, value := range arrayVal {
-					fmt.Println("len: ", len(split), i)
-					_, v := processAltFields(callInfo, split[i+1], value)
-					strv, ok := v.(string)
+		if old == field {
+			// fmt.Println("Check before processing: ", new, old)
+			split := strings.Split(new, ".")
+			for i, altf := range split {
+				if strings.Contains(altf, "[]") {
+					arrayVal, ok := val.([]interface{})
 					if !ok {
 						continue
 					}
-					strVal += strv
-					strVal += ","
-					// fmt.Println("After recursive call: ", f, strVal)
-				}
-				strVal = strings.TrimSuffix(strVal, ",")
-				val = strVal
-			} else {
-				mapval, ok := val.(map[string]interface{})
-				if ok {
-					nval, ok := mapval[altf]
+					strVal := ""
+					for _, value := range arrayVal {
+						// fmt.Println("len: ", len(split), i)
+						_, v := processAltFields(callInfo, split[i+1], value)
+						strv, ok := v.(string)
+						if !ok {
+							continue
+						}
+						strVal += strv
+						strVal += ","
+						// fmt.Println("After recursive call: ", f, strVal)
+					}
+					strVal = strings.TrimSuffix(strVal, ",")
+					val = strVal
+				} else {
+					mapval, ok := val.(map[string]interface{})
 					if ok {
-						val = nval
+						nval, ok := mapval[altf]
+						if ok {
+							val = nval
+						}
 					}
 				}
 			}
-		}
-		if !reflect.DeepEqual(val, value) {
-			return old, val
+			if !reflect.DeepEqual(val, value) {
+				// fmt.Println("Returning: ", old, val)
+				return old, val
+			}
 		}
 	}
 
@@ -172,6 +177,7 @@ func processAltFields(callInfo *CallInfo, field string, value interface{}) (stri
 	if ok {
 		field = f
 	}
+	// fmt.Println("Check after processing: ", field, val)
 	return field, value
 }
 
