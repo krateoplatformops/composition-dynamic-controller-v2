@@ -298,6 +298,18 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 		log.Err(err).Msg("Setting condition")
 		return err
 	}
+	for k, v := range *body {
+		for _, identifier := range clientInfo.Resource.Identifiers {
+			if k == identifier {
+				err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
+				if err != nil {
+					log.Err(err).Msg("Setting identifier")
+					return err
+				}
+				break
+			}
+		}
+	}
 
 	err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
 		DiscoveryClient: h.discoveryClient,
