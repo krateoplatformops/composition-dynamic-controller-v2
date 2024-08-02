@@ -13,6 +13,7 @@ import (
 	fgetter "github.com/hashicorp/go-getter"
 	stringset "github.com/krateoplatformops/composition-dynamic-controller/internal/text"
 	"github.com/pb33f/libopenapi"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	orderedmap "github.com/pb33f/libopenapi/orderedmap"
 )
@@ -156,29 +157,65 @@ func (u *UnstructuredClient) RequestedBody(httpMethod string, path string) (body
 	if !ok {
 		return bodyParams, nil
 	}
-
-	for schema := bodySchema.Schema.Schema().Properties.First(); schema != nil; schema = schema.Next() {
-		bodyParams.Add(schema.Key())
-	}
-
 	schema, err := bodySchema.Schema.BuildSchema()
 	if err != nil {
 		return nil, fmt.Errorf("building schema for %s: %w", path, err)
 	}
+	populateFromAllOf(schema)
 
+	for sch := schema.Properties.First(); sch != nil; sch = sch.Next() {
+		bodyParams.Add(sch.Key())
+	}
+
+	// for _, proxy := range schema.AllOf {
+	// 	propSchema, err := proxy.BuildSchema()
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("building schema for %s: %w", path, err)
+	// 	}
+	// 	// Iterate over the properties of the schema with First() and Next()
+	// 	for prop := propSchema.Properties.First(); prop != nil; prop = prop.Next() {
+	// 		// Add the property to the schema
+	// 		bodyParams.Add(prop.Key())
+	// 	}
+	// }
+
+	return bodyParams, nil
+}
+
+// func PopulateFromAllOf() is a method that populates the schema with the properties from the allOf field.
+// the recursive function to populate the schema with the properties from the allOf field.
+func populateFromAllOf(schema *base.Schema) {
+	if len(schema.Type) > 0 && schema.Type[0] == "array" {
+		if schema.Items != nil {
+			if schema.Items.N == 0 {
+				sch, err := schema.Items.A.BuildSchema()
+				if err != nil {
+					return
+				}
+
+				populateFromAllOf(sch)
+			}
+		}
+		return
+	}
+	for prop := schema.Properties.First(); prop != nil; prop = prop.Next() {
+		populateFromAllOf(prop.Value().Schema())
+	}
 	for _, proxy := range schema.AllOf {
 		propSchema, err := proxy.BuildSchema()
+		populateFromAllOf(propSchema)
 		if err != nil {
-			return nil, fmt.Errorf("building schema for %s: %w", path, err)
+			return
 		}
 		// Iterate over the properties of the schema with First() and Next()
 		for prop := propSchema.Properties.First(); prop != nil; prop = prop.Next() {
+			if schema.Properties == nil {
+				schema.Properties = orderedmap.New[string, *base.SchemaProxy]()
+			}
 			// Add the property to the schema
-			bodyParams.Add(prop.Key())
+			schema.Properties.Set(prop.Key(), prop.Value())
 		}
 	}
-
-	return bodyParams, nil
 }
 
 func (u *UnstructuredClient) RequestedParams(httpMethod string, path string) (parameters stringset.StringSet, query stringset.StringSet, err error) {
