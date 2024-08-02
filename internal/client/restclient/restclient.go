@@ -290,6 +290,52 @@ func (u *UnstructuredClient) Patch(ctx context.Context, cli *http.Client, path s
 	return &val, nil
 }
 
+func (u *UnstructuredClient) Put(ctx context.Context, cli *http.Client, path string, opts *RequestConfiguration) (*map[string]interface{}, error) {
+	uri := buildPath(u.Server, path, opts.Parameters, opts.Query)
+
+	err := u.ValidateRequest("PUT", path, opts.Parameters, opts.Query)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := httplib.Put(uri.String(), httplib.ToJSON(opts.Body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	var val map[string]interface{}
+	apiErr := &APIError{}
+
+	httpMethod := "PUT"
+	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
+	if !ok {
+		return nil, fmt.Errorf("path not found: %s", path)
+	}
+	getDoc, ok := pathItem.GetOperations().Get(strings.ToLower(httpMethod))
+	if !ok {
+		return nil, fmt.Errorf("operation not found: %s", httpMethod)
+	}
+
+	validStatusCodes, err := getValidResponseCode(getDoc.Responses.Codes)
+	if err != nil {
+		return nil, err
+	}
+
+	err = httplib.Fire(cli, req, httplib.FireOptions{
+		Verbose:         u.Verbose,
+		ResponseHandler: httplib.FromJSON(&val),
+		AuthMethod:      u.Auth,
+		Validators: []httplib.HandleResponseFunc{
+			httplib.ErrorJSON(apiErr, validStatusCodes...),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &val, nil
+}
+
 func (u *UnstructuredClient) Delete(ctx context.Context, cli *http.Client, path string, opts *RequestConfiguration) (*map[string]interface{}, error) {
 	uri := buildPath(u.Server, path, opts.Parameters, opts.Query)
 
@@ -321,8 +367,12 @@ func (u *UnstructuredClient) Delete(ctx context.Context, cli *http.Client, path 
 	}
 
 	var response any
-
-	rh := httplib.FromJSON(&response)
+	rh := func(r *http.Response) error {
+		if r.ContentLength == 0 {
+			return nil
+		}
+		return httplib.FromJSON(&response)(r)
+	}
 
 	if containsStatusCode(http.StatusNoContent, validStatusCodes) {
 		rh = nil

@@ -120,18 +120,8 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 		// return false, nil
 	}
 	var body *map[string]interface{}
-	isKnown := false
-	// If status is empty, the resource is not created yet.
-	for _, identifier := range clientInfo.Resource.Identifiers {
-		if statusFields[identifier] != nil {
-			isKnown = true
-			break
-		}
-		if specFields[identifier] != nil {
-			isKnown = true
-			break
-		}
-	}
+	isKnown := isResourceKnown(cli, log, clientInfo, statusFields, specFields)
+
 	if isKnown {
 		// Getting the external resource by its identifier
 		apiCall, callInfo, err := APICallBuilder(cli, clientInfo, apiaction.Get)
@@ -308,6 +298,18 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 		log.Err(err).Msg("Setting condition")
 		return err
 	}
+	for k, v := range *body {
+		for _, identifier := range clientInfo.Resource.Identifiers {
+			if k == identifier {
+				err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
+				if err != nil {
+					log.Err(err).Msg("Setting identifier")
+					return err
+				}
+				break
+			}
+		}
+	}
 
 	err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
 		DiscoveryClient: h.discoveryClient,
@@ -456,6 +458,10 @@ func (h *handler) Delete(ctx context.Context, mg *unstructured.Unstructured) err
 		return err
 	}
 	apiCall, callInfo, err := APICallBuilder(cli, clientInfo, apiaction.Delete)
+	if apiCall == nil {
+		log.Warn().Msgf("API call not found for %s", apiaction.Delete)
+		return removeFinalizersAndUpdate(ctx, log, h.discoveryClient, h.dynamicClient, mg)
+	}
 	if err != nil {
 		log.Err(err).Msg("Building API call")
 		return err
@@ -479,16 +485,38 @@ func (h *handler) Delete(ctx context.Context, mg *unstructured.Unstructured) err
 		return err
 	}
 
-	// Deleting finalizer
+	return removeFinalizersAndUpdate(ctx, log, h.discoveryClient, h.dynamicClient, mg)
+}
+
+func removeFinalizersAndUpdate(ctx context.Context, log zerolog.Logger, discovery *discovery.DiscoveryClient, dynamic dynamic.Interface, mg *unstructured.Unstructured) error {
 	mg.SetFinalizers([]string{})
-	err = tools.Update(ctx, mg, tools.UpdateOptions{
-		DiscoveryClient: h.discoveryClient,
-		DynamicClient:   h.dynamicClient,
+	err := tools.Update(ctx, mg, tools.UpdateOptions{
+		DiscoveryClient: discovery,
+		DynamicClient:   dynamic,
 	})
 	if err != nil {
 		log.Err(err).Msg("Deleting finalizer")
 		return err
 	}
-
 	return nil
+}
+
+func isResourceKnown(cli *restclient.UnstructuredClient, log zerolog.Logger, clientInfo *getter.Info, statusFields map[string]interface{}, specFields map[string]interface{}) bool {
+	apiCall, callInfo, err := APICallBuilder(cli, clientInfo, apiaction.Get)
+	if apiCall == nil {
+		return false
+	}
+	if err != nil {
+		log.Err(err).Msg("Building API call")
+		return false
+	}
+	reqConfiguration := BuildCallConfig(callInfo, statusFields, specFields)
+	if reqConfiguration == nil {
+		return false
+	}
+
+	if cli.ValidateRequest("GET", callInfo.Path, reqConfiguration.Parameters, reqConfiguration.Query) != nil {
+		return false
+	}
+	return true
 }

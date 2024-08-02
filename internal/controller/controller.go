@@ -82,7 +82,10 @@ func New(sid *shortid.Shortid, opts Options) *Controller {
 					Resource: strings.ToLower(flect.Pluralize(el.GetKind())),
 				}
 
-				el.SetFinalizers(append(el.GetFinalizers(), "composition.krateo.io/finalizer"))
+				if len(el.GetFinalizers()) == 0 {
+					el.SetFinalizers(append(el.GetFinalizers(), "composition.krateo.io/finalizer"))
+				}
+
 				_, err = opts.Client.Resource(gvr).Namespace(el.GetNamespace()).Update(context.Background(), el, metav1.UpdateOptions{})
 				if err != nil {
 					opts.Logger.Error().Err(err).Msg("AddFunc: updating object finalizer.")
