@@ -260,34 +260,130 @@ func isCRUpdated(def getter.Resource, mg *unstructured.Unstructured, rm map[stri
 		return true, nil
 	}
 
-	return compareExisting(mg, rm)
+	m, err := unstructuredtools.GetFieldsFromUnstructured(mg, "spec")
+	if err != nil {
+		return false, fmt.Errorf("error getting spec fields: %w", err)
+	}
+
+	return compareExisting(m, rm), nil
 }
 
-// recursive function to compare the field existing in the response rm with the field in the mg
-func compareExisting(mg *unstructured.Unstructured, rm map[string]interface{}) (bool, error) {
-	for k, v := range rm {
-		if v == nil {
+// compareExisting recursively compares fields between two maps and logs differences.
+func compareExisting(mg map[string]interface{}, rm map[string]interface{}, path ...string) bool {
+	for key, value := range mg {
+		currentPath := append(path, key)
+		pathStr := fmt.Sprintf("%v", currentPath)
+
+		rmValue, ok := rm[key]
+		if !ok {
 			continue
 		}
-		if reflect.TypeOf(v).Kind() == reflect.Map {
-			m, ok := v.(map[string]interface{})
-			if !ok {
-				return false, fmt.Errorf("error converting value to map[string]interface{}")
-			}
-			if reflect.DeepEqual(m, mg.Object[k]) {
+
+		switch reflect.TypeOf(value).Kind() {
+		case reflect.Map:
+			mgMap, ok1 := value.(map[string]interface{})
+			if !ok1 {
+				fmt.Printf("Type assertion failed for map at '%s'\n", pathStr)
 				continue
 			}
-			return compareExisting(mg, m)
+			rmMap, ok2 := rmValue.(map[string]interface{})
+			if !ok2 {
+				fmt.Printf("Type assertion failed for map at '%s'\n", pathStr)
+				continue
+			}
+			if !compareExisting(mgMap, rmMap, currentPath...) {
+				fmt.Printf("Values differ at '%s'\n", pathStr)
+				return false
+			}
+		case reflect.Slice:
+			valueSlice, ok1 := value.([]interface{})
+			if !ok1 || reflect.TypeOf(rmValue).Kind() != reflect.Slice {
+				fmt.Printf("Values are not both slices or type assertion failed at '%s'\n", pathStr)
+				continue
+			}
+			rmSlice, ok2 := rmValue.([]interface{})
+			if !ok2 {
+				fmt.Printf("Type assertion failed for slice at '%s'\n", pathStr)
+				continue
+			}
+			for i, v := range valueSlice {
+				if reflect.TypeOf(v).Kind() == reflect.Map {
+					mgMap, ok1 := v.(map[string]interface{})
+					if !ok1 {
+						fmt.Printf("Type assertion failed for map at '%s'\n", pathStr)
+						continue
+					}
+					rmMap, ok2 := rmSlice[i].(map[string]interface{})
+					if !ok2 {
+						fmt.Printf("Type assertion failed for map at '%s'\n", pathStr)
+						continue
+					}
+					if !compareExisting(mgMap, rmMap, currentPath...) {
+						fmt.Printf("Values differ at '%s'\n", pathStr)
+						return false
+					}
+				} else if v != rmSlice[i] {
+					fmt.Printf("Values differ at '%s'\n", pathStr)
+					return false
+				}
+			}
+		default:
+			if !compareAny(value, rmValue) {
+				fmt.Printf("Values differ at '%s' %s %s\n", pathStr, value, rmValue)
+				return false
+			}
 		}
-		if _, ok := mg.Object[k]; !ok {
-			continue
-		}
-
-		if reflect.DeepEqual(v, mg.Object[k]) {
-			continue
-		}
-		return false, nil
 	}
-	return true, nil
 
+	return true
+}
+func numberCaster(value interface{}) int64 {
+	switch v := value.(type) {
+	case int:
+		return int64(v)
+	case int8:
+		return int64(v)
+	case int16:
+		return int64(v)
+	case int32:
+		return int64(v)
+	case int64:
+		return v // No conversion needed since v is already int64
+	case uint:
+		return int64(v)
+	case uint8:
+		return int64(v)
+	case uint16:
+		return int64(v)
+	case uint32:
+		return int64(v)
+	case uint64:
+		return int64(v)
+	case float32:
+		return int64(v)
+	case float64:
+		return int64(v)
+	default:
+		return -999999 // Return a default value if none of the cases match
+	}
+}
+
+func compareAny(a any, b any) bool {
+	//if is number compare as number
+	switch a.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		ia := numberCaster(a)
+		ib := numberCaster(b)
+		return ia == ib
+	case string:
+		sa := a.(string)
+		sb := b.(string)
+		return sa == sb
+	case bool:
+		ba := a.(bool)
+		bb := b.(bool)
+		return ba == bb
+	default:
+		return reflect.DeepEqual(a, b)
+	}
 }
