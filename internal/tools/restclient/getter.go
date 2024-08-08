@@ -251,7 +251,7 @@ func (g *dynamicGetter) getAuth(un *unstructured.Unstructured) (httplib.AuthMeth
 		return nil, fmt.Errorf("error getting spec.authenticationRefs for '%v' in namespace: %s", gvr, un.GetNamespace())
 	}
 	if !ok {
-		return nil, fmt.Errorf("missing spec.authenticationRefs in definition for '%v' in namespace: %s", gvr, un.GetNamespace())
+		return nil, nil
 	}
 
 	for key := range authenticationRefsMap {
