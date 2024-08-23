@@ -146,9 +146,6 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 			log.Err(err).Msg("Performing REST call")
 			return false, err
 		}
-		if body == nil {
-			return false, fmt.Errorf("response body is nil")
-		}
 	} else {
 		apiCall, callInfo, err := APICallBuilder(cli, clientInfo, apiaction.FindBy)
 		if apiCall == nil {
@@ -187,43 +184,42 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 			log.Err(err).Msg("Performing REST call")
 			return false, err
 		}
-		if body == nil {
-			return false, fmt.Errorf("response body is nil")
-		}
 	}
 
-	for k, v := range *body {
-		for _, identifier := range clientInfo.Resource.Identifiers {
-			if k == identifier {
-				err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
-				if err != nil {
-					log.Err(err).Msg("Setting identifier")
-					return false, err
+	if body != nil {
+		for k, v := range *body {
+			for _, identifier := range clientInfo.Resource.Identifiers {
+				if k == identifier {
+					err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
+					if err != nil {
+						log.Err(err).Msg("Setting identifier")
+						return false, err
+					}
+					break
 				}
-				break
 			}
 		}
-	}
-	err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
-		DiscoveryClient: h.discoveryClient,
-		DynamicClient:   h.dynamicClient,
-	})
-	if err != nil {
-		log.Err(err).Msg("Updating status")
-		return false, err
-	}
 
-	ok, err := isCRUpdated(clientInfo.Resource, mg, *body)
-	if err != nil {
-		log.Err(err).Msg("Checking if CR is updated")
-		return false, err
-	}
-	if !ok {
-		log.Debug().Str("Resource", mg.GetKind()).Msg("External resource not up-to-date.")
-		return true, apierrors.NewNotFound(schema.GroupResource{
-			Group:    mg.GroupVersionKind().Group,
-			Resource: flect.Pluralize(strings.ToLower(mg.GetKind())),
-		}, mg.GetName())
+		err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
+			DiscoveryClient: h.discoveryClient,
+			DynamicClient:   h.dynamicClient,
+		})
+		if err != nil {
+			log.Err(err).Msg("Updating status")
+			return false, err
+		}
+		ok, err := isCRUpdated(clientInfo.Resource, mg, *body)
+		if err != nil {
+			log.Err(err).Msg("Checking if CR is updated")
+			return false, err
+		}
+		if !ok {
+			log.Debug().Str("Resource", mg.GetKind()).Msg("External resource not up-to-date.")
+			return true, apierrors.NewNotFound(schema.GroupResource{
+				Group:    mg.GroupVersionKind().Group,
+				Resource: flect.Pluralize(strings.ToLower(mg.GetKind())),
+			}, mg.GetName())
+		}
 	}
 	log.Debug().Str("Resource", mg.GetKind()).Msg("Setting condition.")
 	err = unstructuredtools.SetCondition(mg, condition.Available())
@@ -287,9 +283,6 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 		log.Err(err).Msg("Performing REST call")
 		return err
 	}
-	if body == nil {
-		return fmt.Errorf("response body is nil")
-	}
 
 	log.Debug().Str("Resource", mg.GetKind()).Msg("Creating external resource.")
 
@@ -298,15 +291,17 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 		log.Err(err).Msg("Setting condition")
 		return err
 	}
-	for k, v := range *body {
-		for _, identifier := range clientInfo.Resource.Identifiers {
-			if k == identifier {
-				err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
-				if err != nil {
-					log.Err(err).Msg("Setting identifier")
-					return err
+	if body != nil {
+		for k, v := range *body {
+			for _, identifier := range clientInfo.Resource.Identifiers {
+				if k == identifier {
+					err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
+					if err != nil {
+						log.Err(err).Msg("Setting identifier")
+						return err
+					}
+					break
 				}
-				break
 			}
 		}
 	}
@@ -372,17 +367,16 @@ func (h *handler) Update(ctx context.Context, mg *unstructured.Unstructured) err
 		log.Err(err).Msg("Performing REST call")
 		return err
 	}
-	if body == nil {
-		return fmt.Errorf("response body is nil")
-	}
 
-	for k, v := range *body {
-		for _, identifier := range clientInfo.Resource.Identifiers {
-			if k == identifier {
-				err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
-				if err != nil {
-					log.Err(err).Msg("Setting identifier")
-					return err
+	if body != nil {
+		for k, v := range *body {
+			for _, identifier := range clientInfo.Resource.Identifiers {
+				if k == identifier {
+					err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
+					if err != nil {
+						log.Err(err).Msg("Setting identifier")
+						return err
+					}
 				}
 			}
 		}

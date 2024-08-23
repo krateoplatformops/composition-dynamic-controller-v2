@@ -99,9 +99,23 @@ func (u *UnstructuredClient) Get(ctx context.Context, cli *http.Client, path str
 		return nil, err
 	}
 
+	var response any
+	rh := func(r *http.Response) error {
+		if r.ContentLength == 0 {
+			return nil
+		}
+		if r.StatusCode == http.StatusNoContent {
+			return nil
+		}
+		if r.Body == nil {
+			return &httplib.StatusError{StatusCode: 404}
+		}
+		return httplib.FromJSON(&response)(r)
+	}
+
 	err = httplib.Fire(cli, req, httplib.FireOptions{
 		Verbose:         u.Verbose,
-		ResponseHandler: httplib.FromJSON(&val),
+		ResponseHandler: rh,
 		AuthMethod:      u.Auth,
 		Validators: []httplib.HandleResponseFunc{
 			httplib.ErrorJSON(apiErr, validStatusCodes...),
@@ -110,8 +124,9 @@ func (u *UnstructuredClient) Get(ctx context.Context, cli *http.Client, path str
 	if err != nil {
 		return nil, err
 	}
-	if val == nil {
-		return nil, &httplib.StatusError{StatusCode: 404}
+	val, ok = response.(map[string]interface{})
+	if !ok {
+		return nil, nil
 	}
 	return &val, nil
 }
@@ -148,9 +163,17 @@ func (u *UnstructuredClient) Post(ctx context.Context, cli *http.Client, path st
 		return nil, err
 	}
 
+	var response any
+	rh := func(r *http.Response) error {
+		if r.ContentLength == 0 {
+			return nil
+		}
+		return httplib.FromJSON(&response)(r)
+	}
+
 	err = httplib.Fire(cli, req, httplib.FireOptions{
 		Verbose:         u.Verbose,
-		ResponseHandler: httplib.FromJSON(&val),
+		ResponseHandler: rh,
 		AuthMethod:      u.Auth,
 		Validators: []httplib.HandleResponseFunc{
 			httplib.ErrorJSON(apiErr, validStatusCodes...),
@@ -158,6 +181,10 @@ func (u *UnstructuredClient) Post(ctx context.Context, cli *http.Client, path st
 	})
 	if err != nil {
 		return nil, err
+	}
+	val, ok = response.(map[string]interface{})
+	if !ok {
+		return nil, nil
 	}
 	return &val, nil
 }
@@ -192,9 +219,17 @@ func (u *UnstructuredClient) List(ctx context.Context, cli *http.Client, path st
 		return nil, err
 	}
 
+	var response any
+	rh := func(r *http.Response) error {
+		if r.ContentLength == 0 {
+			return nil
+		}
+		return httplib.FromJSON(&response)(r)
+	}
+
 	err = httplib.Fire(cli, req, httplib.FireOptions{
 		Verbose:         u.Verbose,
-		ResponseHandler: httplib.FromJSON(&val),
+		ResponseHandler: rh,
 		AuthMethod:      u.Auth,
 		Validators: []httplib.HandleResponseFunc{
 			httplib.ErrorJSON(apiErr, validStatusCodes...),
@@ -202,6 +237,10 @@ func (u *UnstructuredClient) List(ctx context.Context, cli *http.Client, path st
 	})
 	if err != nil {
 		return nil, err
+	}
+	val, ok = response.(map[string]interface{})
+	if !ok {
+		return nil, nil
 	}
 	return &val, nil
 }
@@ -276,9 +315,17 @@ func (u *UnstructuredClient) Patch(ctx context.Context, cli *http.Client, path s
 		return nil, err
 	}
 
+	var response any
+	rh := func(r *http.Response) error {
+		if r.ContentLength == 0 {
+			return nil
+		}
+		return httplib.FromJSON(&response)(r)
+	}
+
 	err = httplib.Fire(cli, req, httplib.FireOptions{
 		Verbose:         u.Verbose,
-		ResponseHandler: httplib.FromJSON(&val),
+		ResponseHandler: rh,
 		AuthMethod:      u.Auth,
 		Validators: []httplib.HandleResponseFunc{
 			httplib.ErrorJSON(apiErr, validStatusCodes...),
@@ -286,6 +333,10 @@ func (u *UnstructuredClient) Patch(ctx context.Context, cli *http.Client, path s
 	})
 	if err != nil {
 		return nil, err
+	}
+	val, ok = response.(map[string]interface{})
+	if !ok {
+		return nil, nil
 	}
 	return &val, nil
 }
@@ -322,9 +373,21 @@ func (u *UnstructuredClient) Put(ctx context.Context, cli *http.Client, path str
 		return nil, err
 	}
 
+	var response any
+	rh := func(r *http.Response) error {
+		if r.ContentLength == 0 {
+			return nil
+		}
+		return httplib.FromJSON(&response)(r)
+	}
+
+	if containsStatusCode(http.StatusNoContent, validStatusCodes) {
+		rh = nil
+	}
+
 	err = httplib.Fire(cli, req, httplib.FireOptions{
 		Verbose:         u.Verbose,
-		ResponseHandler: httplib.FromJSON(&val),
+		ResponseHandler: rh,
 		AuthMethod:      u.Auth,
 		Validators: []httplib.HandleResponseFunc{
 			httplib.ErrorJSON(apiErr, validStatusCodes...),
@@ -332,6 +395,10 @@ func (u *UnstructuredClient) Put(ctx context.Context, cli *http.Client, path str
 	})
 	if err != nil {
 		return nil, err
+	}
+	val, ok = response.(map[string]interface{})
+	if !ok {
+		return nil, nil
 	}
 	return &val, nil
 }
@@ -372,10 +439,6 @@ func (u *UnstructuredClient) Delete(ctx context.Context, cli *http.Client, path 
 			return nil
 		}
 		return httplib.FromJSON(&response)(r)
-	}
-
-	if containsStatusCode(http.StatusNoContent, validStatusCodes) {
-		rh = nil
 	}
 
 	err = httplib.Fire(cli, req, httplib.FireOptions{
