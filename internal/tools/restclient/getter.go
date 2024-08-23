@@ -335,13 +335,22 @@ func parseAuthentication(un *unstructured.Unstructured, authType restclient.Auth
 			Password: password,
 		}, nil
 	} else if authType == restclient.AuthTypeBearer {
-		token, ok, err := unstructured.NestedString(un.Object, "spec", "token")
+		tokenRef, ok, err := unstructured.NestedStringMap(un.Object, "spec", "tokenRef")
 		if err != nil {
 			return nil, err
 		}
 		if !ok {
-			return nil, fmt.Errorf("missing spec.token in definition for '%v' in namespace: %s", gvr, un.GetNamespace())
+			return nil, fmt.Errorf("missing spec.tokenRef in definition for '%v' in namespace: %s", gvr, un.GetNamespace())
 		}
+		token, err := GetSecret(context.Background(), dyn, SecretKeySelector{
+			Name:      tokenRef["name"],
+			Namespace: tokenRef["namespace"],
+			Key:       tokenRef["key"],
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error getting token for '%v' in namespace: %s - %w", gvr, un.GetNamespace(), err)
+		}
+
 		return &httplib.TokenAuth{
 			Token: token,
 		}, nil
