@@ -14,7 +14,6 @@ import (
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/client/restclient"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/controller"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/meta"
-	"github.com/krateoplatformops/composition-dynamic-controller/internal/text"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/tools/apiaction"
 	getter "github.com/krateoplatformops/composition-dynamic-controller/internal/tools/restclient"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/tools/unstructured/condition"
@@ -117,7 +116,6 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 	statusFields, err := unstructuredtools.GetFieldsFromUnstructured(mg, "status")
 	if err != nil {
 		log.Warn().AnErr("Getting status", err)
-		// return false, nil
 	}
 	var body *map[string]interface{}
 	isKnown := isResourceKnown(cli, log, clientInfo, statusFields, specFields)
@@ -187,17 +185,10 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 	}
 
 	if body != nil {
-		for k, v := range *body {
-			for _, identifier := range clientInfo.Resource.Identifiers {
-				if k == identifier {
-					err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
-					if err != nil {
-						log.Err(err).Msg("Setting identifier")
-						return false, err
-					}
-					break
-				}
-			}
+		err = populateStatusFields(clientInfo, mg, body)
+		if err != nil {
+			log.Err(err).Msg("Updating identifiers")
+			return false, err
 		}
 
 		err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
@@ -291,19 +282,11 @@ func (h *handler) Create(ctx context.Context, mg *unstructured.Unstructured) err
 		log.Err(err).Msg("Setting condition")
 		return err
 	}
-	if body != nil {
-		for k, v := range *body {
-			for _, identifier := range clientInfo.Resource.Identifiers {
-				if k == identifier {
-					err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
-					if err != nil {
-						log.Err(err).Msg("Setting identifier")
-						return err
-					}
-					break
-				}
-			}
-		}
+
+	err = populateStatusFields(clientInfo, mg, body)
+	if err != nil {
+		log.Err(err).Msg("Updating identifiers")
+		return err
 	}
 
 	err = tools.UpdateStatus(ctx, mg, tools.UpdateOptions{
@@ -368,18 +351,10 @@ func (h *handler) Update(ctx context.Context, mg *unstructured.Unstructured) err
 		return err
 	}
 
-	if body != nil {
-		for k, v := range *body {
-			for _, identifier := range clientInfo.Resource.Identifiers {
-				if k == identifier {
-					err = unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
-					if err != nil {
-						log.Err(err).Msg("Setting identifier")
-						return err
-					}
-				}
-			}
-		}
+	err = populateStatusFields(clientInfo, mg, body)
+	if err != nil {
+		log.Err(err).Msg("Updating identifiers")
+		return err
 	}
 
 	log.Debug().Str("Resource", mg.GetKind()).Msg("Creating external resource.")
@@ -480,37 +455,4 @@ func (h *handler) Delete(ctx context.Context, mg *unstructured.Unstructured) err
 	}
 
 	return removeFinalizersAndUpdate(ctx, log, h.discoveryClient, h.dynamicClient, mg)
-}
-
-func removeFinalizersAndUpdate(ctx context.Context, log zerolog.Logger, discovery *discovery.DiscoveryClient, dynamic dynamic.Interface, mg *unstructured.Unstructured) error {
-	mg.SetFinalizers([]string{})
-	err := tools.Update(ctx, mg, tools.UpdateOptions{
-		DiscoveryClient: discovery,
-		DynamicClient:   dynamic,
-	})
-	if err != nil {
-		log.Err(err).Msg("Deleting finalizer")
-		return err
-	}
-	return nil
-}
-
-func isResourceKnown(cli *restclient.UnstructuredClient, log zerolog.Logger, clientInfo *getter.Info, statusFields map[string]interface{}, specFields map[string]interface{}) bool {
-	apiCall, callInfo, err := APICallBuilder(cli, clientInfo, apiaction.Get)
-	if apiCall == nil {
-		return false
-	}
-	if err != nil {
-		log.Err(err).Msg("Building API call")
-		return false
-	}
-	reqConfiguration := BuildCallConfig(callInfo, statusFields, specFields)
-	if reqConfiguration == nil {
-		return false
-	}
-
-	if cli.ValidateRequest("GET", callInfo.Path, reqConfiguration.Parameters, reqConfiguration.Query) != nil {
-		return false
-	}
-	return true
 }

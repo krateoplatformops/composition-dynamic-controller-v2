@@ -10,12 +10,16 @@ import (
 	"github.com/gobuffalo/flect"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/client/restclient"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/text"
+	"github.com/krateoplatformops/composition-dynamic-controller/internal/tools"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/tools/apiaction"
 	getter "github.com/krateoplatformops/composition-dynamic-controller/internal/tools/restclient"
 	unstructuredtools "github.com/krateoplatformops/composition-dynamic-controller/internal/tools/unstructured"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -386,4 +390,54 @@ func compareAny(a any, b any) bool {
 	default:
 		return reflect.DeepEqual(a, b)
 	}
+}
+
+func removeFinalizersAndUpdate(ctx context.Context, log zerolog.Logger, discovery *discovery.DiscoveryClient, dynamic dynamic.Interface, mg *unstructured.Unstructured) error {
+	mg.SetFinalizers([]string{})
+	err := tools.Update(ctx, mg, tools.UpdateOptions{
+		DiscoveryClient: discovery,
+		DynamicClient:   dynamic,
+	})
+	if err != nil {
+		log.Err(err).Msg("Deleting finalizer")
+		return err
+	}
+	return nil
+}
+
+func populateStatusFields(clientInfo *getter.Info, mg *unstructured.Unstructured, body *map[string]interface{}) error {
+	if body != nil {
+		for k, v := range *body {
+			for _, identifier := range clientInfo.Resource.Identifiers {
+				if k == identifier {
+					err := unstructured.SetNestedField(mg.Object, text.GenericToString(v), "status", identifier)
+					if err != nil {
+						log.Err(err).Msg("Setting identifier")
+						return err
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func isResourceKnown(cli *restclient.UnstructuredClient, log zerolog.Logger, clientInfo *getter.Info, statusFields map[string]interface{}, specFields map[string]interface{}) bool {
+	apiCall, callInfo, err := APICallBuilder(cli, clientInfo, apiaction.Get)
+	if apiCall == nil {
+		return false
+	}
+	if err != nil {
+		log.Err(err).Msg("Building API call")
+		return false
+	}
+	reqConfiguration := BuildCallConfig(callInfo, statusFields, specFields)
+	if reqConfiguration == nil {
+		return false
+	}
+
+	if cli.ValidateRequest("GET", callInfo.Path, reqConfiguration.Parameters, reqConfiguration.Query) != nil {
+		return false
+	}
+	return true
 }
