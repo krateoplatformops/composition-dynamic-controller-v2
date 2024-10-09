@@ -18,11 +18,10 @@ import (
 type UnstructuredClient struct {
 	IdentifierFields []string
 	SpecFields       *unstructured.Unstructured
-
-	Server    string
-	DocScheme *libopenapi.DocumentModel[v3.Document]
-	Auth      httplib.AuthMethod
-	Verbose   bool
+	Server           string
+	DocScheme        *libopenapi.DocumentModel[v3.Document]
+	Auth             httplib.AuthMethod
+	Verbose          bool
 }
 
 // 'field' could be in the format of 'spec.field1.field2'
@@ -71,6 +70,13 @@ type RequestConfiguration struct {
 
 func (u *UnstructuredClient) Get(ctx context.Context, cli *http.Client, path string, opts *RequestConfiguration) (*map[string]interface{}, error) {
 	uri := buildPath(u.Server, path, opts.Parameters, opts.Query)
+	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
+	if !ok {
+		return nil, fmt.Errorf("path not found - Get: %s", path)
+	}
+	if len(pathItem.Get.Servers) > 0 {
+		uri = buildPath(pathItem.Get.Servers[0].URL, path, opts.Parameters, opts.Query)
+	}
 
 	err := u.ValidateRequest("GET", path, opts.Parameters, opts.Query)
 	if err != nil {
@@ -85,10 +91,6 @@ func (u *UnstructuredClient) Get(ctx context.Context, cli *http.Client, path str
 	apiErr := &APIError{}
 
 	httpMethod := "GET"
-	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
-	if !ok {
-		return nil, fmt.Errorf("path not found - Get: %s", path)
-	}
 	getDoc, ok := pathItem.GetOperations().Get(strings.ToLower(httpMethod))
 	if !ok {
 		return nil, fmt.Errorf("operation not found: %s", httpMethod)
@@ -133,6 +135,13 @@ func (u *UnstructuredClient) Get(ctx context.Context, cli *http.Client, path str
 
 func (u *UnstructuredClient) Post(ctx context.Context, cli *http.Client, path string, opts *RequestConfiguration) (*map[string]interface{}, error) {
 	uri := buildPath(u.Server, path, opts.Parameters, opts.Query)
+	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
+	if !ok {
+		return nil, fmt.Errorf("path not found: %s", path)
+	}
+	if len(pathItem.Post.Servers) > 0 {
+		uri = buildPath(pathItem.Post.Servers[0].URL, path, opts.Parameters, opts.Query)
+	}
 
 	err := u.ValidateRequest("POST", path, opts.Parameters, opts.Query)
 	if err != nil {
@@ -149,10 +158,7 @@ func (u *UnstructuredClient) Post(ctx context.Context, cli *http.Client, path st
 	apiErr := &APIError{}
 
 	httpMethod := "POST"
-	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
-	if !ok {
-		return nil, fmt.Errorf("path not found: %s", path)
-	}
+
 	getDoc, ok := pathItem.GetOperations().Get(strings.ToLower(httpMethod))
 	if !ok {
 		return nil, fmt.Errorf("operation not found: %s", httpMethod)
@@ -191,6 +197,13 @@ func (u *UnstructuredClient) Post(ctx context.Context, cli *http.Client, path st
 
 func (u *UnstructuredClient) List(ctx context.Context, cli *http.Client, path string, opts *RequestConfiguration) (*map[string]interface{}, error) {
 	uri := buildPath(u.Server, path, opts.Parameters, opts.Query)
+	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
+	if !ok {
+		return nil, fmt.Errorf("path not found - list: %s", path)
+	}
+	if len(pathItem.Get.Servers) > 0 {
+		uri = buildPath(pathItem.Get.Servers[0].URL, path, opts.Parameters, opts.Query)
+	}
 
 	err := u.ValidateRequest("GET", path, opts.Parameters, opts.Query)
 	if err != nil {
@@ -205,10 +218,6 @@ func (u *UnstructuredClient) List(ctx context.Context, cli *http.Client, path st
 	apiErr := &APIError{}
 
 	httpMethod := "GET"
-	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
-	if !ok {
-		return nil, fmt.Errorf("path not found - list: %s", path)
-	}
 	getDoc, ok := pathItem.GetOperations().Get(strings.ToLower(httpMethod))
 	if !ok {
 		return nil, fmt.Errorf("operation not found: %s", httpMethod)
@@ -285,6 +294,13 @@ func (u *UnstructuredClient) FindBy(ctx context.Context, cli *http.Client, path 
 
 func (u *UnstructuredClient) Patch(ctx context.Context, cli *http.Client, path string, opts *RequestConfiguration) (*map[string]interface{}, error) {
 	uri := buildPath(u.Server, path, opts.Parameters, opts.Query)
+	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
+	if !ok {
+		return nil, fmt.Errorf("path not found: %s", path)
+	}
+	if len(pathItem.Patch.Servers) > 0 {
+		uri = buildPath(pathItem.Patch.Servers[0].URL, path, opts.Parameters, opts.Query)
+	}
 
 	err := u.ValidateRequest("PATCH", path, opts.Parameters, opts.Query)
 	if err != nil {
@@ -301,10 +317,7 @@ func (u *UnstructuredClient) Patch(ctx context.Context, cli *http.Client, path s
 	apiErr := &APIError{}
 
 	httpMethod := "PATCH"
-	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
-	if !ok {
-		return nil, fmt.Errorf("path not found: %s", path)
-	}
+
 	getDoc, ok := pathItem.GetOperations().Get(strings.ToLower(httpMethod))
 	if !ok {
 		return nil, fmt.Errorf("operation not found: %s", httpMethod)
@@ -343,6 +356,13 @@ func (u *UnstructuredClient) Patch(ctx context.Context, cli *http.Client, path s
 
 func (u *UnstructuredClient) Put(ctx context.Context, cli *http.Client, path string, opts *RequestConfiguration) (*map[string]interface{}, error) {
 	uri := buildPath(u.Server, path, opts.Parameters, opts.Query)
+	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
+	if !ok {
+		return nil, fmt.Errorf("path not found: %s", path)
+	}
+	if len(pathItem.Put.Servers) > 0 {
+		uri = buildPath(pathItem.Put.Servers[0].URL, path, opts.Parameters, opts.Query)
+	}
 
 	err := u.ValidateRequest("PUT", path, opts.Parameters, opts.Query)
 	if err != nil {
@@ -359,10 +379,6 @@ func (u *UnstructuredClient) Put(ctx context.Context, cli *http.Client, path str
 	apiErr := &APIError{}
 
 	httpMethod := "PUT"
-	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
-	if !ok {
-		return nil, fmt.Errorf("path not found: %s", path)
-	}
 	getDoc, ok := pathItem.GetOperations().Get(strings.ToLower(httpMethod))
 	if !ok {
 		return nil, fmt.Errorf("operation not found: %s", httpMethod)
@@ -405,6 +421,13 @@ func (u *UnstructuredClient) Put(ctx context.Context, cli *http.Client, path str
 
 func (u *UnstructuredClient) Delete(ctx context.Context, cli *http.Client, path string, opts *RequestConfiguration) (*map[string]interface{}, error) {
 	uri := buildPath(u.Server, path, opts.Parameters, opts.Query)
+	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
+	if !ok {
+		return nil, fmt.Errorf("path not found: %s", path)
+	}
+	if len(pathItem.Delete.Servers) > 0 {
+		uri = buildPath(pathItem.Delete.Servers[0].URL, path, opts.Parameters, opts.Query)
+	}
 
 	err := u.ValidateRequest("DELETE", path, opts.Parameters, opts.Query)
 	if err != nil {
@@ -419,10 +442,6 @@ func (u *UnstructuredClient) Delete(ctx context.Context, cli *http.Client, path 
 	apiErr := &APIError{}
 
 	httpMethod := "DELETE"
-	pathItem, ok := u.DocScheme.Model.Paths.PathItems.Get(path)
-	if !ok {
-		return nil, fmt.Errorf("path not found: %s", path)
-	}
 	getDoc, ok := pathItem.GetOperations().Get(strings.ToLower(httpMethod))
 	if !ok {
 		return nil, fmt.Errorf("operation not found: %s", httpMethod)
