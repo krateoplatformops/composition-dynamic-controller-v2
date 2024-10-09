@@ -38,6 +38,7 @@ type CallInfo struct {
 
 type APIFuncDef func(ctx context.Context, cli *http.Client, path string, conf *restclient.RequestConfiguration) (*map[string]interface{}, error)
 
+// APICallBuilder builds the API call based on the action and the info from the RestDefinition
 func APICallBuilder(cli *restclient.UnstructuredClient, info *getter.Info, action apiaction.APIAction) (apifunc APIFuncDef, callInfo *CallInfo, err error) {
 	identifierFields := info.Resource.Identifiers
 	for _, descr := range info.Resource.VerbsDescription {
@@ -95,6 +96,7 @@ func APICallBuilder(cli *restclient.UnstructuredClient, info *getter.Info, actio
 	return nil, nil, nil //fmt.Errorf("impossible to build api call for action %s", action.String())
 }
 
+// BuildCallConfig builds the request configuration based on the callInfo and the fields from the status and spec
 func BuildCallConfig(callInfo *CallInfo, statusFields map[string]interface{}, specFields map[string]interface{}) *restclient.RequestConfiguration {
 	reqConfiguration := &restclient.RequestConfiguration{}
 	reqConfiguration.Parameters = make(map[string]string)
@@ -185,6 +187,7 @@ func processAltFields(callInfo *CallInfo, field string, value interface{}) (stri
 	return field, value
 }
 
+// resolveObjectFromReferenceInfo resolves the object from the reference info, used by OwnerReference
 func resolveObjectFromReferenceInfo(ref getter.ReferenceInfo, mg *unstructured.Unstructured, dyClient dynamic.Interface) (*unstructured.Unstructured, error) {
 	gvrForReference := schema.GroupVersionResource{
 		Group:    ref.GroupVersionKind.Group,
@@ -247,6 +250,7 @@ func resolveObjectFromReferenceInfo(ref getter.ReferenceInfo, mg *unstructured.U
 	return nil, fmt.Errorf("no reference found for resource %s", gvrForReference.Resource)
 }
 
+// isCRUpdated checks if the CR was updated by comparing the fields in the CR with the response from the API call, if existing cr fields are different from the response, it returns false
 func isCRUpdated(def getter.Resource, mg *unstructured.Unstructured, rm map[string]interface{}) (bool, error) {
 	specs, err := unstructuredtools.GetFieldsFromUnstructured(mg, "spec")
 	if err != nil {
@@ -405,6 +409,7 @@ func removeFinalizersAndUpdate(ctx context.Context, log zerolog.Logger, discover
 	return nil
 }
 
+// populateStatusFields populates the status fields in the mg object with the values from the body
 func populateStatusFields(clientInfo *getter.Info, mg *unstructured.Unstructured, body *map[string]interface{}) error {
 	if body != nil {
 		for k, v := range *body {
@@ -422,6 +427,7 @@ func populateStatusFields(clientInfo *getter.Info, mg *unstructured.Unstructured
 	return nil
 }
 
+// tries to find the resource in the cluster, with the given statusFields and specFields values, if it is able to validate the GET request, returns true
 func isResourceKnown(cli *restclient.UnstructuredClient, log zerolog.Logger, clientInfo *getter.Info, statusFields map[string]interface{}, specFields map[string]interface{}) bool {
 	apiCall, callInfo, err := APICallBuilder(cli, clientInfo, apiaction.Get)
 	if apiCall == nil {
@@ -436,7 +442,14 @@ func isResourceKnown(cli *restclient.UnstructuredClient, log zerolog.Logger, cli
 		return false
 	}
 
-	if cli.ValidateRequest("GET", callInfo.Path, reqConfiguration.Parameters, reqConfiguration.Query) != nil {
+	actionGetMethod := "GET"
+	for _, descr := range clientInfo.Resource.VerbsDescription {
+		if strings.EqualFold(descr.Action, apiaction.Get.String()) {
+			actionGetMethod = descr.Method
+		}
+	}
+
+	if cli.ValidateRequest(actionGetMethod, callInfo.Path, reqConfiguration.Parameters, reqConfiguration.Query) != nil {
 		return false
 	}
 	return true
