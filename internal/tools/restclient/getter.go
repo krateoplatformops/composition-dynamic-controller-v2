@@ -27,8 +27,8 @@ type VerbsDescription struct {
 	Method string `json:"method"`
 	// Path: the path to the api
 	Path string `json:"path"`
-	// AltFieldMapping: the alternative mapping of the fields to use in the request
-	AltFieldMapping map[string]string `json:"altFieldMapping,omitempty"`
+	// // AltFieldMapping: the alternative mapping of the fields to use in the request
+	// AltFieldMapping map[string]string `json:"altFieldMapping,omitempty"`
 }
 
 type Resource struct {
@@ -38,9 +38,6 @@ type Resource struct {
 	Identifiers []string `json:"identifiers"`
 	// VerbsDescription: the list of verbs to use on this resource
 	VerbsDescription []VerbsDescription `json:"verbsDescription"`
-	// CompareList: the list of fields to compare when checking if the resource is the same
-	// +optional
-	CompareList []string `json:"compareList,omitempty"`
 }
 
 type GVK struct {
@@ -77,9 +74,6 @@ type Info struct {
 
 	// Verbose: if true, the client will dump verbose output
 	Verbose bool `json:"verbose,omitempty"`
-
-	// OwnerReferences: the list of owner references to use when creating the resource
-	OwnerReferences []ReferenceInfo `json:"ownerReferences,omitempty"`
 }
 
 type Getter interface {
@@ -182,27 +176,6 @@ func (g *dynamicGetter) Get(un *unstructured.Unstructured) (*Info, error) {
 			return nil, err
 		}
 
-		ownerRefs, _, err := unstructured.NestedSlice(item.Object, "spec", "resource", "ownerRefs")
-		if err != nil {
-			return nil, err
-		}
-
-		var ownerReferences []ReferenceInfo
-
-		for _, ownerRef := range ownerRefs {
-			jsonData, err := json.Marshal(ownerRef)
-			if err != nil {
-				return nil, err
-			}
-			var ref ReferenceInfo
-			err = json.Unmarshal(jsonData, &ref)
-			if err != nil {
-				return nil, err
-			}
-
-			ownerReferences = append(ownerReferences, ref)
-		}
-
 		if group == gvr.Group {
 			gvk := un.GroupVersionKind()
 			// Convert the map to JSON
@@ -224,10 +197,9 @@ func (g *dynamicGetter) Get(un *unstructured.Unstructured) (*Info, error) {
 
 			if resource.Kind == gvk.Kind {
 				return &Info{
-					URL:             oasPath,
-					Resource:        resource,
-					Auth:            auth,
-					OwnerReferences: ownerReferences,
+					URL:      oasPath,
+					Resource: resource,
+					Auth:     auth,
 				}, nil
 			}
 		}

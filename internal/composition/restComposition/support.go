@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/gobuffalo/flect"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/client/restclient"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/text"
 	"github.com/krateoplatformops/composition-dynamic-controller/internal/tools"
@@ -16,9 +15,7 @@ import (
 	unstructuredtools "github.com/krateoplatformops/composition-dynamic-controller/internal/tools/unstructured"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 )
@@ -33,7 +30,6 @@ type CallInfo struct {
 	Path             string
 	ReqParams        *RequestedParams
 	IdentifierFields []string
-	AltFields        map[string]string
 }
 
 type APIFuncDef func(ctx context.Context, cli *http.Client, path string, conf *restclient.RequestConfiguration) (*map[string]interface{}, error)
@@ -72,7 +68,6 @@ func APICallBuilder(cli *restclient.UnstructuredClient, info *getter.Info, actio
 					Query:      query,
 					Body:       body,
 				},
-				AltFields:        descr.AltFieldMapping,
 				IdentifierFields: identifierFields,
 			}
 			switch method {
@@ -93,7 +88,7 @@ func APICallBuilder(cli *restclient.UnstructuredClient, info *getter.Info, actio
 			}
 		}
 	}
-	return nil, nil, nil //fmt.Errorf("impossible to build api call for action %s", action.String())
+	return nil, nil, nil
 }
 
 // BuildCallConfig builds the request configuration based on the callInfo and the fields from the status and spec
@@ -111,9 +106,6 @@ func BuildCallConfig(callInfo *CallInfo, statusFields map[string]interface{}, sp
 
 func processFields(callInfo *CallInfo, fields map[string]interface{}, reqConfiguration *restclient.RequestConfiguration, mapBody map[string]interface{}) {
 	for field, value := range fields {
-		// fmt.Println("Processing field: ", field, value)
-		field, value = processAltFields(callInfo, field, value)
-		// fmt.Println("Field: ", field, value)
 		if field == "" {
 			continue
 		}
@@ -135,139 +127,8 @@ func processFields(callInfo *CallInfo, fields map[string]interface{}, reqConfigu
 	}
 }
 
-// if there are alternative fields, we need to check if the field is in the alternative field mapping
-func processAltFields(callInfo *CallInfo, field string, value interface{}) (string, interface{}) {
-	val := value
-	for new, old := range callInfo.AltFields {
-		if old == field {
-			// fmt.Println("Check before processing: ", new, old)
-			split := strings.Split(new, ".")
-			for i, altf := range split {
-				if strings.Contains(altf, "[]") {
-					arrayVal, ok := val.([]interface{})
-					if !ok {
-						continue
-					}
-					strVal := ""
-					for _, value := range arrayVal {
-						// fmt.Println("len: ", len(split), i)
-						_, v := processAltFields(callInfo, split[i+1], value)
-						strv, ok := v.(string)
-						if !ok {
-							continue
-						}
-						strVal += strv
-						strVal += ","
-						// fmt.Println("After recursive call: ", f, strVal)
-					}
-					strVal = strings.TrimSuffix(strVal, ",")
-					val = strVal
-				} else {
-					mapval, ok := val.(map[string]interface{})
-					if ok {
-						nval, ok := mapval[altf]
-						if ok {
-							val = nval
-						}
-					}
-				}
-			}
-			if !reflect.DeepEqual(val, value) {
-				// fmt.Println("Returning: ", old, val)
-				return old, val
-			}
-		}
-	}
-
-	f, ok := callInfo.AltFields[field]
-	if ok {
-		field = f
-	}
-	// fmt.Println("Check after processing: ", field, val)
-	return field, value
-}
-
-// resolveObjectFromReferenceInfo resolves the object from the reference info, used by OwnerReference
-func resolveObjectFromReferenceInfo(ref getter.ReferenceInfo, mg *unstructured.Unstructured, dyClient dynamic.Interface) (*unstructured.Unstructured, error) {
-	gvrForReference := schema.GroupVersionResource{
-		Group:    ref.GroupVersionKind.Group,
-		Version:  ref.GroupVersionKind.Version,
-		Resource: strings.ToLower(flect.Pluralize(ref.GroupVersionKind.Kind)),
-	}
-
-	all, err := dyClient.Resource(gvrForReference).
-		List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("error getting reference resource - %w", err)
-	}
-	if len(all.Items) == 0 {
-		return nil, fmt.Errorf("no reference found for resource %s - len is zero", gvrForReference.Resource)
-	}
-
-	fieldValue, ok, err := unstructured.NestedString(mg.Object, "spec", ref.Field)
-	if !ok {
-		return nil, fmt.Errorf("spec field %s not found in reference resource", ref.Field)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("error getting spec field %s from reference resource - %w", ref.Field, err)
-	}
-
-	for _, item := range all.Items {
-		statusMap, ok, err := unstructured.NestedMap(item.Object, "status")
-		if !ok {
-			return nil, fmt.Errorf("status field not found in reference resource")
-		}
-		if err != nil {
-			return nil, fmt.Errorf("error getting status field from reference resource - %w", err)
-		}
-
-		for _, v := range statusMap {
-			strField, ok := v.(string)
-			if ok {
-				if strField == fieldValue {
-					return &item, nil
-				}
-			}
-		}
-
-		specMap, ok, err := unstructured.NestedMap(item.Object, "spec")
-		if !ok {
-			return nil, fmt.Errorf("spec field not found in reference resource")
-		}
-		if err != nil {
-			return nil, fmt.Errorf("error getting spec field from reference resource - %w", err)
-		}
-		for _, v := range specMap {
-			strField, ok := v.(string)
-			if ok {
-				if strField == fieldValue {
-					return &item, nil
-				}
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("no reference found for resource %s", gvrForReference.Resource)
-}
-
 // isCRUpdated checks if the CR was updated by comparing the fields in the CR with the response from the API call, if existing cr fields are different from the response, it returns false
-func isCRUpdated(def getter.Resource, mg *unstructured.Unstructured, rm map[string]interface{}) (bool, error) {
-	specs, err := unstructuredtools.GetFieldsFromUnstructured(mg, "spec")
-	if err != nil {
-		return false, fmt.Errorf("error getting spec fields: %w", err)
-	}
-	if len(def.CompareList) > 0 {
-		for _, field := range def.CompareList {
-			if _, ok := rm[field]; !ok {
-				return false, fmt.Errorf("field %s not found in response", field)
-			}
-			if !reflect.DeepEqual(specs[field], rm[field]) {
-				return false, nil
-			}
-		}
-		return true, nil
-	}
-
+func isCRUpdated(mg *unstructured.Unstructured, rm map[string]interface{}) (bool, error) {
 	m, err := unstructuredtools.GetFieldsFromUnstructured(mg, "spec")
 	if err != nil {
 		return false, fmt.Errorf("error getting spec fields: %w", err)
@@ -449,8 +310,5 @@ func isResourceKnown(cli *restclient.UnstructuredClient, log zerolog.Logger, cli
 		}
 	}
 
-	if cli.ValidateRequest(actionGetMethod, callInfo.Path, reqConfiguration.Parameters, reqConfiguration.Query) != nil {
-		return false
-	}
-	return true
+	return cli.ValidateRequest(actionGetMethod, callInfo.Path, reqConfiguration.Parameters, reqConfiguration.Query) == nil
 }

@@ -1,7 +1,0 @@
-apiVersion: composition.krateo.io/v12-8-3
-kind: Postgresql
-metadata:
-  name: sample
-  namespace: krateo-system
-spec:
-  architecture: standalone

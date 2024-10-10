@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/gobuffalo/flect"
@@ -77,23 +75,6 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 	if clientInfo == nil {
 		return false, fmt.Errorf("swagger info is nil")
 	}
-
-	for _, ownerRef := range clientInfo.OwnerReferences {
-		ref, err := resolveObjectFromReferenceInfo(ownerRef, mg, h.dynamicClient)
-		if err != nil {
-			log.Err(err).Msg("Resolving reference")
-			return false, err
-		}
-		mg.SetOwnerReferences([]metav1.OwnerReference{
-			{
-				APIVersion: ref.GetAPIVersion(),
-				Kind:       ref.GetKind(),
-				Name:       ref.GetName(),
-				UID:        ref.GetUID(),
-			},
-		})
-	}
-
 	tools.Update(ctx, mg, tools.UpdateOptions{
 		DiscoveryClient: h.discoveryClient,
 		DynamicClient:   h.dynamicClient,
@@ -199,7 +180,7 @@ func (h *handler) Observe(ctx context.Context, mg *unstructured.Unstructured) (b
 			log.Err(err).Msg("Updating status")
 			return false, err
 		}
-		ok, err := isCRUpdated(clientInfo.Resource, mg, *body)
+		ok, err := isCRUpdated(mg, *body)
 		if err != nil {
 			log.Err(err).Msg("Checking if CR is updated")
 			return false, err
