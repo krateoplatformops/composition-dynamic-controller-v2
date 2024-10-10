@@ -1,7 +1,0 @@
-kind: BearerAuth
-apiVersion: github.com/v1alpha1
-metadata:
-  name: github-bearer
-spec:
-  deletionPolicy: Orphan 
-  token: <redacted> #organization token

@@ -13,7 +13,7 @@ spec:
   organization: matteogastaldello-org
   merge: false
   securityNamespaceId: 2e9eb7ed-3c0a-47d4-87c1-0ffdd275fd87
-  token: repoV2/52450aae-0a79-4b16-a48d-494f69358a51/d6a32af7-9953-4a63-9701-46a44fd3dd54
+  token: repoV2/60862fa3-989e-4414-a8c9-7e9a138a2e4f/d6a32af7-9953-4a63-9701-46a44fd3dd54
   accessControlEntries:
   - descriptor: Microsoft.TeamFoundation.Identity;S-1-9-1551374245-2919908690-2030704203-2760722767-1765116497-1-397549586-221523779-3159594684-3044897150
     allow: 8

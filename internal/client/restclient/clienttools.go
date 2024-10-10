@@ -240,6 +240,7 @@ func (u *UnstructuredClient) RequestedParams(httpMethod string, path string) (pa
 	return parameters, query, nil
 }
 
+// BuildClient is a function that builds partial client from a swagger file.
 func BuildClient(swaggerPath string) (*UnstructuredClient, error) {
 	basePath := "/tmp/composition-dynamic-controller"
 	err := os.MkdirAll(basePath, 0755)
